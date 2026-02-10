@@ -103,11 +103,13 @@ export default function WeeklyScheduleScreen() {
 
   // Group API appointments by weekday
   const apiSchedule = useMemo(() => {
-    if (isDemo || !apiData?.result) return null;
+    if (isDemo || !apiData) return null;
+    const rawResult = Array.isArray(apiData) ? apiData : (apiData as any)?.result ?? [];
+    if (!Array.isArray(rawResult) || rawResult.length === 0) return null;
     const grouped: Record<string, Appointment[]> = { Mon: [], Tue: [], Wed: [], Thu: [], Fri: [] };
     const dayMap: Record<string, string> = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri' };
 
-    for (const apt of apiData.result) {
+    for (const apt of rawResult) {
       const dayKey = apt.weekDay ? dayMap[apt.weekDay] : null;
       // Also try deriving from dateAsAString
       let resolvedDay = dayKey;

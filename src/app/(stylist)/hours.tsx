@@ -66,7 +66,9 @@ export default function MyAvailabilityScreen() {
   const hours: DaySchedule[] = useMemo(() => {
     if (isDemo || !businessHoursData) return MOCK_HOURS;
     const bh = businessHoursData as any;
-    const slots = bh?.slots || bh?.data?.slots;
+    // Handle possible { result: [...] } wrapper or direct object
+    const unwrapped = Array.isArray(bh) ? bh[0] : bh?.result ? (Array.isArray(bh.result) ? bh.result[0] : bh.result) : bh;
+    const slots = unwrapped?.slots || unwrapped?.data?.slots;
     if (!slots || !Array.isArray(slots)) return MOCK_HOURS;
     return mapBusinessHoursToSchedule(slots);
   }, [isDemo, businessHoursData]);

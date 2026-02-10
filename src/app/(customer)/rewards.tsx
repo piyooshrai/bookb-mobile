@@ -110,10 +110,12 @@ export default function RewardsScreen() {
   const { data: rewardInfo, isLoading } = useRewardInfo(!isDemo);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  const coinBalance = !isDemo && rewardInfo ? rewardInfo.coins : COIN_BALANCE;
+  const safeRewardInfo = rewardInfo && typeof rewardInfo === 'object' && !Array.isArray(rewardInfo) ? rewardInfo : (rewardInfo as any)?.result ?? null;
+  const coinBalance = !isDemo && safeRewardInfo ? safeRewardInfo.coins : COIN_BALANCE;
 
-  const transactions = !isDemo && rewardInfo?.coinsHistory?.length
-    ? rewardInfo.coinsHistory.map((tx) => ({
+  const coinsHistory = Array.isArray(safeRewardInfo?.coinsHistory) ? safeRewardInfo.coinsHistory : [];
+  const transactions = !isDemo && coinsHistory.length > 0
+    ? coinsHistory.map((tx: any) => ({
         id: tx._id,
         amount: tx.coin || tx.amount,
         type: (tx.transactionType === 'added' ? 'earned' : 'spent') as 'earned' | 'spent',

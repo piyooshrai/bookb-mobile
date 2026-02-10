@@ -175,8 +175,10 @@ export default function ClientNotesScreen() {
   );
 
   const clients = useMemo(() => {
-    if (isDemo || !apiData?.result) return MOCK_CLIENTS;
-    const derived = buildClientsFromAppointments(apiData.result);
+    if (isDemo || !apiData) return MOCK_CLIENTS;
+    const rawResult = Array.isArray(apiData) ? apiData : (apiData as any)?.result ?? [];
+    if (!Array.isArray(rawResult) || rawResult.length === 0) return MOCK_CLIENTS;
+    const derived = buildClientsFromAppointments(rawResult);
     return derived.length > 0 ? derived : MOCK_CLIENTS;
   }, [isDemo, apiData]);
 

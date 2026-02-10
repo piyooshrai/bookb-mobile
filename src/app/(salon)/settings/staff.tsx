@@ -44,7 +44,7 @@ export default function StaffManagementScreen() {
 
   const apiStaff: StaffMember[] = useMemo(() => {
     if (isDemo || !stylistsData) return INITIAL_STAFF;
-    const list = Array.isArray(stylistsData) ? stylistsData : stylistsData.users || stylistsData.stylists || [];
+    const list = Array.isArray(stylistsData) ? stylistsData : (stylistsData as any)?.result || (stylistsData as any)?.users || (stylistsData as any)?.stylists || [];
     return list.map((s: any) => ({
       id: s._id || s.id,
       name: s.name || 'Staff',

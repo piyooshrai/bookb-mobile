@@ -100,10 +100,10 @@ export default function NewAppointmentScreen() {
   // Build API-based services and stylists
   const apiServices = useMemo(() => {
     if (isDemo || !serviceGroupsData) return SERVICES;
-    const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : [];
+    const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : (serviceGroupsData as any)?.result || (serviceGroupsData as any)?.serviceGroups || [];
     const flat: typeof SERVICES = [];
     groups.forEach((group: any) => {
-      const mainSvc = group.mainService;
+      const mainSvc = group.mainService || group.category;
       if (mainSvc) {
         flat.push({
           id: mainSvc._id,
@@ -113,7 +113,8 @@ export default function NewAppointmentScreen() {
           category: 'All',
         });
       }
-      (group.subServices || []).forEach((sub: any) => {
+      const rawSubs = group.subServices || group.subService || [];
+      (Array.isArray(rawSubs) ? rawSubs : []).forEach((sub: any) => {
         flat.push({
           id: sub._id,
           name: sub.title || 'Sub-service',
@@ -128,7 +129,7 @@ export default function NewAppointmentScreen() {
 
   const apiStylists = useMemo(() => {
     if (isDemo || !stylistsData) return STYLISTS;
-    const list = Array.isArray(stylistsData) ? stylistsData : stylistsData.users || stylistsData.stylists || [];
+    const list = Array.isArray(stylistsData) ? stylistsData : (stylistsData as any)?.result || (stylistsData as any)?.users || (stylistsData as any)?.stylists || [];
     const mapped = list.map((s: any) => ({
       id: s._id || s.id,
       name: s.name || 'Stylist',

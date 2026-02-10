@@ -92,11 +92,11 @@ export default function SalonDashboardScreen() {
 
   const upcomingAppointments = useMemo(() => {
     if (isDemo || !appointmentsData) return MOCK_UPCOMING;
-    const list = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.appointments || [];
+    const list = Array.isArray(appointmentsData) ? appointmentsData : (appointmentsData as any)?.result || (appointmentsData as any)?.appointments || [];
     return list.slice(0, 5).map((apt: any) => ({
       id: apt._id || apt.id,
       client: typeof apt.user === 'object' ? apt.user?.name : 'Client',
-      service: typeof apt.mainService === 'object' ? apt.mainService?.title : (typeof apt.subService === 'object' ? apt.subService?.title : 'Service'),
+      service: typeof apt.mainService === 'object' ? apt.mainService?.title : (typeof (apt.subService || apt.subServices) === 'object' ? (apt.subService || apt.subServices)?.title : 'Service'),
       stylist: typeof apt.stylist === 'object' ? apt.stylist?.name : 'Stylist',
       time: apt.timeAsAString || '',
       duration: apt.mainService?.requiredTime ? `${apt.mainService.requiredTime} min` : '60 min',
@@ -106,7 +106,7 @@ export default function SalonDashboardScreen() {
 
   const staffList = useMemo(() => {
     if (isDemo || !stylistsData) return MOCK_STYLISTS;
-    const list = Array.isArray(stylistsData) ? stylistsData : stylistsData.users || stylistsData.stylists || [];
+    const list = Array.isArray(stylistsData) ? stylistsData : (stylistsData as any)?.result || (stylistsData as any)?.users || (stylistsData as any)?.stylists || [];
     return list.slice(0, 6).map((s: any) => ({
       id: s._id || s.id,
       name: s.name || 'Staff',

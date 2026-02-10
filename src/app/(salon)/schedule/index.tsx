@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { useAuthStore } from '@/stores/authStore';
 import { useDashboardAppointments } from '@/hooks/useAppointments';
+import { useStylistsBySalon } from '@/hooks/useStylist';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -68,6 +69,22 @@ export default function AppointmentsCalendarScreen() {
   const salonId = useAuthStore((s) => s.salonId);
 
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [selectedStylistId, setSelectedStylistId] = useState<string | null>(null);
+
+  // Fetch stylists for this salon so we can pass stylistId to the dashboard query
+  const { data: stylistsData } = useStylistsBySalon();
+  const stylists: { _id: string; name: string }[] = useMemo(() => {
+    if (!stylistsData) return [];
+    const list = Array.isArray(stylistsData) ? stylistsData : (stylistsData as any).result || [];
+    return list.map((s: any) => ({ _id: s._id, name: s.name }));
+  }, [stylistsData]);
+
+  // Auto-select first stylist when list loads
+  useEffect(() => {
+    if (!selectedStylistId && stylists.length > 0) {
+      setSelectedStylistId(stylists[0]._id);
+    }
+  }, [stylists, selectedStylistId]);
 
   // Compute the date for the selected day
   const selectedDate = useMemo(() => {
@@ -79,13 +96,13 @@ export default function AppointmentsCalendarScreen() {
   const offset = new Date().getTimezoneOffset();
 
   const { data: appointmentsData, isLoading } = useDashboardAppointments(
-    { salon: salonId || '', fromDate: selectedDate, toDate: selectedDate, offset },
-    !isDemo && !!salonId,
+    { stylistId: selectedStylistId || '', fromDate: selectedDate, toDate: selectedDate, offset },
+    !isDemo && !!selectedStylistId,
   );
 
   const displayAppointments: Appointment[] = useMemo(() => {
     if (isDemo || !appointmentsData) return MOCK_APPOINTMENTS;
-    const list = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.appointments || [];
+    const list = Array.isArray(appointmentsData) ? appointmentsData : (appointmentsData as any).result || [];
     if (list.length === 0) return MOCK_APPOINTMENTS;
     return list.map((apt: any, idx: number) => ({
       id: apt._id || String(idx),
@@ -146,6 +163,25 @@ export default function AppointmentsCalendarScreen() {
           ))}
         </View>
       </View>
+
+      {/* Stylist selector */}
+      {!isDemo && stylists.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stylistRow} contentContainerStyle={styles.stylistRowContent}>
+          {stylists.map((s) => {
+            const isActive = s._id === selectedStylistId;
+            return (
+              <TouchableOpacity
+                key={s._id}
+                style={[styles.stylistPill, isActive && styles.stylistPillActive]}
+                activeOpacity={0.7}
+                onPress={() => setSelectedStylistId(s._id)}
+              >
+                <Text style={[styles.stylistPillText, isActive && styles.stylistPillTextActive]}>{s.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
 
       {/* Appointments list */}
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
@@ -360,4 +396,34 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   bottomSpacer: { height: 20 },
+  // Stylist selector
+  stylistRow: {
+    maxHeight: 48,
+    backgroundColor: colors.warmGrey,
+  },
+  stylistRowContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  stylistPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stylistPillActive: {
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
+  },
+  stylistPillText: {
+    fontFamily: fontFamilies.bodyMedium,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  stylistPillTextActive: {
+    color: colors.textWhite,
+  },
 });

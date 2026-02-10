@@ -61,7 +61,8 @@ export default function MyStatsScreen() {
   // Map analytics to earnings
   const earningsAmount = useMemo(() => {
     if (isDemo || !analyticsData) return '$2,840';
-    const analytics = Array.isArray(analyticsData) ? analyticsData[0] : analyticsData;
+    const unwrappedAnalytics = Array.isArray(analyticsData) ? analyticsData : (analyticsData as any)?.result ?? analyticsData;
+    const analytics = Array.isArray(unwrappedAnalytics) ? unwrappedAnalytics[0] : unwrappedAnalytics;
     const sales = (analytics as any)?.totalSales?.value;
     if (sales !== undefined) return `$${Number(sales).toLocaleString()}`;
     return '$2,840';
@@ -69,7 +70,8 @@ export default function MyStatsScreen() {
 
   const earningsTrend = useMemo(() => {
     if (isDemo || !analyticsData) return '+12% vs last month';
-    const analytics = Array.isArray(analyticsData) ? analyticsData[0] : analyticsData;
+    const unwrappedAnalytics2 = Array.isArray(analyticsData) ? analyticsData : (analyticsData as any)?.result ?? analyticsData;
+    const analytics = Array.isArray(unwrappedAnalytics2) ? unwrappedAnalytics2[0] : unwrappedAnalytics2;
     const pct = (analytics as any)?.totalSales?.percentage;
     const trend = (analytics as any)?.totalSales?.trend;
     if (pct !== undefined) return `${trend === 'down' ? '-' : '+'}${pct}% vs last period`;
@@ -79,7 +81,8 @@ export default function MyStatsScreen() {
   // Map to mini stats
   const displayMiniStats = useMemo(() => {
     if (isDemo || !generalCount) return miniStats;
-    const gc = generalCount as any;
+    const rawGc = generalCount as any;
+    const gc = Array.isArray(rawGc) ? rawGc[0] : rawGc?.result ? (Array.isArray(rawGc.result) ? rawGc.result[0] : rawGc.result) : rawGc;
     return [
       { label: 'Clients served', value: gc?.clients?.toString() || gc?.users?.toString() || miniStats[0].value },
       { label: 'Avg Rating', value: gc?.avgRating?.toString() || miniStats[1].value },
@@ -90,7 +93,8 @@ export default function MyStatsScreen() {
   // Map analytics to status breakdown
   const displayStatuses = useMemo(() => {
     if (isDemo || !analyticsData) return appointmentStatuses;
-    const analytics = Array.isArray(analyticsData) ? analyticsData[0] : analyticsData;
+    const unwrappedAnalytics3 = Array.isArray(analyticsData) ? analyticsData : (analyticsData as any)?.result ?? analyticsData;
+    const analytics = Array.isArray(unwrappedAnalytics3) ? unwrappedAnalytics3[0] : unwrappedAnalytics3;
     const aptsItem = (analytics as any)?.appointments;
     if (!aptsItem) return appointmentStatuses;
     // Use total value from analytics if available, keep mock breakdown structure

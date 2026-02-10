@@ -18,7 +18,8 @@ export default function Profile() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [remindersEnabled, setRemindersEnabled] = useState(true);
 
-  const coinsBalance = !isDemo && rewardInfo ? rewardInfo.coins : (user?.coins ?? 100);
+  const safeRewardInfo = rewardInfo && typeof rewardInfo === 'object' && !Array.isArray(rewardInfo) ? rewardInfo : (rewardInfo as any)?.result ?? null;
+  const coinsBalance = !isDemo && safeRewardInfo ? safeRewardInfo.coins : (user?.coins ?? 100);
   const referralCode = !isDemo && user?.referralCode ? user.referralCode : 'DEMO2024';
 
   const initials = user?.name

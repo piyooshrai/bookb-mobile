@@ -71,8 +71,9 @@ export default function ProductDetail() {
       }
     : PRODUCT;
 
-  const similarProducts = !isDemo && apiSimilar
-    ? apiSimilar.map((p: any) => ({
+  const similarList = Array.isArray(apiSimilar) ? apiSimilar : (apiSimilar as any)?.result ?? [];
+  const similarProducts = !isDemo && similarList.length > 0
+    ? similarList.map((p: any) => ({
         id: p._id,
         name: p.productName,
         brand: p.category?.categoryName || 'Brand',

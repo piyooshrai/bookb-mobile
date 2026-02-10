@@ -33,9 +33,11 @@ export default function CartScreen() {
   // Demo mode: local state with INITIAL_CART
   const [demoCart, setDemoCart] = useState(INITIAL_CART);
 
+  const safeStoreCart = Array.isArray(storeCart) ? storeCart : [];
+
   const updateQty = (id: string, delta: number) => {
     if (!isDemo) {
-      const item = storeCart.find((c) => c.productId === id);
+      const item = safeStoreCart.find((c) => c.productId === id);
       if (item) {
         updateCartQuantity(id, item.quantity + delta);
       }
@@ -47,7 +49,7 @@ export default function CartScreen() {
   };
 
   const cart: CartItem[] = !isDemo
-    ? storeCart.map((c) => ({
+    ? safeStoreCart.map((c) => ({
         id: c.productId,
         name: c.name,
         brand: '',

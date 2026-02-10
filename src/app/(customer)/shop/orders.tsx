@@ -26,11 +26,12 @@ export default function OrderHistoryScreen() {
   const isDemo = useAuthStore((s) => s.isDemo);
   const { data: apiOrders, isLoading: ordersLoading } = useOrdersByUser({ pageNumber: 1, pageSize: 20 });
 
-  const orders = !isDemo && apiOrders?.result
-    ? apiOrders.result.map((o: any) => ({
+  const ordersList = Array.isArray(apiOrders) ? apiOrders : Array.isArray((apiOrders as any)?.result) ? (apiOrders as any).result : [];
+  const orders = !isDemo && ordersList.length > 0
+    ? ordersList.map((o: any) => ({
         id: o.orderId || o._id,
         date: new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        items: o.items?.length || 0,
+        items: Array.isArray(o.items) ? o.items.length : 0,
         total: o.totalAmount || 0,
         status: (o.orderStatus || 'Completed') as 'Completed' | 'Pending' | 'Cancel',
       }))

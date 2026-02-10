@@ -27,19 +27,24 @@ export default function SelectStylist() {
 
   const displayStylists = useMemo(() => {
     if (!isDemo && stylistsData) {
-      return stylistsData.map((user) => ({
-        id: user._id,
-        name: user.name,
-        initials: user.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2),
-        role: 'Stylist',
-        specialty: user.description || '',
-        rating: 4.8,
-        reviews: 0,
-        nextAvailable: '',
-        appointments: 0,
-        color: colors.navy,
-        photo: user.photo,
-      }));
+      const list = Array.isArray(stylistsData)
+        ? stylistsData
+        : (stylistsData as any)?.result ?? [];
+      if (list.length > 0) {
+        return list.map((user: any) => ({
+          id: user._id,
+          name: user.name || 'Stylist',
+          initials: (user.name || 'S').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
+          role: 'Stylist',
+          specialty: user.description || '',
+          rating: 4.8,
+          reviews: 0,
+          nextAvailable: '',
+          appointments: 0,
+          color: colors.navy,
+          photo: user.photo,
+        }));
+      }
     }
     return MOCK_STYLISTS.map((s) => ({ ...s, photo: '' }));
   }, [isDemo, stylistsData]);
