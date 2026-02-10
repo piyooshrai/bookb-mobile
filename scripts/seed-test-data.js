@@ -222,6 +222,30 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ─── Debug helper ─────────────────────────────────────────────────────────────
+
+function logResponse(label, res) {
+  console.log(`  [DEBUG ${label}] status=${res.status}, body=${JSON.stringify(res.data).substring(0, 500)}`);
+}
+
+// ─── Try to extract token from any API response ──────────────────────────────
+
+function extractToken(data) {
+  // Try common locations where token might appear
+  if (data?.data?.token) return data.data.token;
+  if (data?.token) return data.token;
+  if (data?.data?.accessToken) return data.data.accessToken;
+  return null;
+}
+
+function extractUserId(data) {
+  if (data?.data?.userid) return data.data.userid;
+  if (data?.data?.userId) return data.data.userId;
+  if (data?.data?._id) return data.data._id;
+  if (data?.data?.user?._id) return data.data.user._id;
+  return null;
+}
+
 // ─── Step 1: Create/Login Salon Owner ────────────────────────────────────────
 
 async function setupSalonOwner() {
@@ -233,27 +257,35 @@ async function setupSalonOwner() {
       email: SALON_OWNER.email,
       password: SALON_OWNER.password,
     });
+    logResponse('login', loginRes);
 
-    if (loginRes.data?.status && loginRes.data?.data?.token) {
-      setToken(loginRes.data.data.token);
-      salonId = loginRes.data.data.userid;
-      log('✅', `Salon owner logged in. ID: ${salonId}`);
+    const token = extractToken(loginRes.data);
+    if (token) {
+      setToken(token);
+      salonId = extractUserId(loginRes.data);
+      log('✅', `Salon owner logged in. Token set. UserID: ${salonId}`);
 
       // Get full user to extract salonId
-      const userRes = await api.get('/users/get-user-by-token');
-      if (userRes.data?.data) {
-        const user = userRes.data.data;
-        salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || user._id;
-        log('✅', `Salon ID: ${salonId}`);
+      try {
+        const userRes = await api.get('/users/get-user-by-token');
+        logResponse('get-user-by-token', userRes);
+        if (userRes.data?.data) {
+          const user = userRes.data.data;
+          salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || user._id;
+          log('✅', `Salon ID: ${salonId}`);
+        }
+      } catch (ue) {
+        log('⚠️', `get-user-by-token failed: ${ue.response?.data?.message || ue.message}`);
       }
       return;
+    } else {
+      log('⚠️', 'Login response had no token, will try signup...');
     }
   } catch (e) {
-    log('ℹ️', 'Salon owner not found, creating new account...');
+    log('ℹ️', `Login failed: ${e.response?.data?.message || e.message}. Trying signup...`);
   }
 
-  // If login fails, try to create via dashboard signup
-  // This may require admin privileges. We'll try the user-signup endpoint.
+  // If login fails, try to create via signup
   try {
     const signupRes = await api.post('/users/user-signup', {
       name: SALON_OWNER.name,
@@ -268,25 +300,47 @@ async function setupSalonOwner() {
       packageName: SALON_OWNER.packageName,
       active: true,
     });
-    log('✅', `Salon owner created: ${signupRes.data?.message || 'success'}`);
+    logResponse('signup', signupRes);
 
-    // Now login
-    await sleep(1000);
-    const loginRes = await api.post('/users/login', {
-      email: SALON_OWNER.email,
-      password: SALON_OWNER.password,
-    });
+    // Check if signup itself returned a token
+    let token = extractToken(signupRes.data);
+    if (token) {
+      setToken(token);
+      salonId = extractUserId(signupRes.data);
+      log('✅', `Got token from signup. UserID: ${salonId}`);
+    } else {
+      // Try logging in after signup
+      log('ℹ️', 'No token in signup response, attempting login...');
+      await sleep(1500);
+      const loginRes = await api.post('/users/login', {
+        email: SALON_OWNER.email,
+        password: SALON_OWNER.password,
+      });
+      logResponse('login-after-signup', loginRes);
 
-    if (loginRes.data?.data?.token) {
-      setToken(loginRes.data.data.token);
-      salonId = loginRes.data.data.userid;
-
-      const userRes = await api.get('/users/get-user-by-token');
-      if (userRes.data?.data) {
-        const user = userRes.data.data;
-        salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || user._id;
+      token = extractToken(loginRes.data);
+      if (token) {
+        setToken(token);
+        salonId = extractUserId(loginRes.data);
+        log('✅', `Logged in after signup. UserID: ${salonId}`);
+      } else {
+        log('❌', 'Could not get token from login after signup!');
       }
-      log('✅', `Salon logged in. Salon ID: ${salonId}`);
+    }
+
+    // Try to get salon ID from user profile
+    if (salonToken) {
+      try {
+        const userRes = await api.get('/users/get-user-by-token');
+        logResponse('get-user-by-token', userRes);
+        if (userRes.data?.data) {
+          const user = userRes.data.data;
+          salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || user._id;
+          log('✅', `Salon ID resolved: ${salonId}`);
+        }
+      } catch (ue) {
+        log('⚠️', `get-user-by-token failed: ${ue.response?.data?.message || ue.message}`);
+      }
     }
   } catch (e) {
     console.error('❌ Failed to create salon owner:', e.response?.data || e.message);
@@ -294,6 +348,12 @@ async function setupSalonOwner() {
     console.error('    Email: ' + SALON_OWNER.email);
     console.error('    Password: ' + SALON_OWNER.password);
     console.error('\n    Then re-run this script.\n');
+    process.exit(1);
+  }
+
+  if (!salonToken) {
+    console.error('❌ FATAL: No auth token obtained. Cannot continue.');
+    console.error('   Please check the API responses above and ensure the login endpoint returns a token.');
     process.exit(1);
   }
 }
@@ -305,41 +365,40 @@ async function createStylists() {
 
   for (const stylist of STYLISTS) {
     try {
-      // Create via dashboard user-signup (requires salon token)
-      const formData = new FormData();
-      formData.append('name', stylist.name);
-      formData.append('email', stylist.email);
-      formData.append('password', stylist.password);
-      formData.append('phone', stylist.phone);
-      formData.append('countryCode', stylist.countryCode);
-      formData.append('gender', stylist.gender);
-      formData.append('description', stylist.description);
-      formData.append('startTime', stylist.startTime);
-      formData.append('endTime', stylist.endTime);
-      formData.append('intervalTime', stylist.intervalTime);
-      formData.append('recurringType', 'week');
-
-      const res = await api.post('/stylist/create-stylist', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const res = await api.post('/stylist/create-stylist', {
+        name: stylist.name,
+        email: stylist.email,
+        password: stylist.password,
+        phone: stylist.phone,
+        countryCode: stylist.countryCode,
+        gender: stylist.gender,
+        description: stylist.description,
+        startTime: stylist.startTime,
+        endTime: stylist.endTime,
+        intervalTime: stylist.intervalTime,
+        recurringType: 'week',
       });
-
+      logResponse(`create-stylist:${stylist.name}`, res);
       log('✅', `  Created stylist: ${stylist.name}`);
     } catch (e) {
-      // May already exist
       log('⚠️', `  Stylist ${stylist.name}: ${e.response?.data?.message || e.message}`);
     }
     await sleep(500);
   }
 
-  // Fetch all stylists for the salon
+  // Always fetch all stylists for the salon to get their IDs
   try {
     const res = await api.get('/stylist/get-stylist-by-salon');
-    if (res.data?.data) {
-      stylistIds = res.data.data.map(s => ({ id: s._id, name: s.name }));
-      log('✅', `  Found ${stylistIds.length} stylists`);
+    logResponse('get-stylists', res);
+    const data = res.data?.data;
+    if (Array.isArray(data) && data.length > 0) {
+      stylistIds = data.map(s => ({ id: s._id, name: s.name || s.userId?.name || 'Unknown' }));
+    } else if (data?.result && Array.isArray(data.result)) {
+      stylistIds = data.result.map(s => ({ id: s._id, name: s.name || s.userId?.name || 'Unknown' }));
     }
+    log('✅', `  Found ${stylistIds.length} stylists: ${stylistIds.map(s => s.name).join(', ')}`);
   } catch (e) {
-    log('⚠️', '  Could not fetch stylists: ' + (e.response?.data?.message || e.message));
+    log('❌', '  Could not fetch stylists: ' + (e.response?.data?.message || e.message));
   }
 }
 
@@ -350,7 +409,6 @@ async function createServices() {
 
   for (const category of SERVICE_CATEGORIES) {
     try {
-      // Create main service (category)
       const mainRes = await api.post('/service/add-service', {
         title: category.title,
         description: category.description,
@@ -360,9 +418,10 @@ async function createServices() {
         breakTime: category.breakTime,
         isMainService: true,
       });
+      logResponse(`add-service:${category.title}`, mainRes);
 
       const mainId = mainRes.data?.data?._id;
-      log('✅', `  Category: ${category.title} (${mainId || 'created'})`);
+      log('✅', `  Category: ${category.title} (ID: ${mainId || 'no ID returned'})`);
 
       if (mainId && category.subServices) {
         const subIds = [];
@@ -396,6 +455,33 @@ async function createServices() {
     }
     await sleep(300);
   }
+
+  // If we didn't capture any sub-services, try fetching them
+  if (subServiceFlatList.length === 0) {
+    log('ℹ️', '  No sub-service IDs captured during creation, fetching from API...');
+    try {
+      const res = await api.get('/service/get-service-groupby-category');
+      logResponse('get-services-grouped', res);
+      if (res.data?.data) {
+        for (const group of res.data.data) {
+          const mainId = group.mainService?._id || group._id;
+          const subs = group.subServices || group.services || [];
+          for (const sub of subs) {
+            subServiceFlatList.push({
+              id: sub._id,
+              mainId,
+              title: sub.title,
+              charges: sub.charges,
+              requiredTime: sub.requiredTime,
+            });
+          }
+        }
+        log('✅', `  Fetched ${subServiceFlatList.length} services from API`);
+      }
+    } catch (e) {
+      log('❌', '  Could not fetch services: ' + (e.response?.data?.message || e.message));
+    }
+  }
 }
 
 // ─── Step 4: Create Products ─────────────────────────────────────────────────
@@ -409,50 +495,54 @@ async function createProducts() {
       const res = await api.post('/product/create-category', {
         categoryName: cat.categoryName,
       });
+      logResponse(`create-category:${cat.categoryName}`, res);
       const catId = res.data?.data?._id;
       if (catId) categoryMap[cat.categoryName] = catId;
-      log('✅', `  Category: ${cat.categoryName}`);
+      log('✅', `  Category: ${cat.categoryName} (ID: ${catId || 'no ID returned'})`);
     } catch (e) {
       log('⚠️', `  Category ${cat.categoryName}: ${e.response?.data?.message || e.message}`);
     }
     await sleep(200);
   }
 
-  // If we didn't get IDs from creation (already existed), fetch them
-  if (Object.keys(categoryMap).length === 0) {
+  // Always try to fetch categories to fill in missing IDs
+  if (Object.keys(categoryMap).length < PRODUCT_CATEGORIES.length) {
+    log('ℹ️', `  Only ${Object.keys(categoryMap).length}/${PRODUCT_CATEGORIES.length} category IDs captured, fetching...`);
     try {
       const res = await api.get('/product/get-enabled-category');
-      if (res.data?.data) {
-        for (const cat of res.data.data) {
-          categoryMap[cat.categoryName] = cat._id;
+      logResponse('get-enabled-category', res);
+      const cats = res.data?.data;
+      if (Array.isArray(cats)) {
+        for (const cat of cats) {
+          if (cat._id && cat.categoryName) {
+            categoryMap[cat.categoryName] = cat._id;
+          }
         }
       }
+      log('✅', `  Category map now has ${Object.keys(categoryMap).length} entries: ${Object.keys(categoryMap).join(', ')}`);
     } catch (e) {
-      log('⚠️', '  Could not fetch categories');
+      log('⚠️', '  Could not fetch categories: ' + (e.response?.data?.message || e.message));
     }
   }
 
-  // Create products
+  // Create products (use JSON, not FormData)
   for (const product of PRODUCTS) {
     const catId = categoryMap[product.category];
     if (!catId) {
-      log('⚠️', `  Skipping ${product.productName} (no category ID for ${product.category})`);
+      log('⚠️', `  Skipping ${product.productName} (no category ID for "${product.category}")`);
       continue;
     }
 
     try {
-      const formData = new FormData();
-      formData.append('productName', product.productName);
-      formData.append('productDescription', product.productDescription);
-      formData.append('productPrice', product.productPrice.toString());
-      formData.append('actualPrice', product.actualPrice.toString());
-      formData.append('quantity', '1');
-      formData.append('stock', product.stock.toString());
-      formData.append('category', catId);
-      formData.append('enable', 'true');
-
-      const res = await api.post('/product/add-product', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const res = await api.post('/product/add-product', {
+        productName: product.productName,
+        productDescription: product.productDescription,
+        productPrice: product.productPrice,
+        actualPrice: product.actualPrice,
+        quantity: 1,
+        stock: product.stock,
+        category: catId,
+        enable: true,
       });
       log('✅', `  ${product.productName} - $${product.productPrice}`);
     } catch (e) {
@@ -490,14 +580,18 @@ async function createClients() {
   // Fetch users to get their IDs
   try {
     const res = await api.get('/users/get-user', { params: { pageNumber: 1, pageSize: 50, filterValue: '' } });
-    if (res.data?.data?.result) {
-      clientUserIds = res.data.data.result
+    logResponse('get-users', res);
+    const result = res.data?.data?.result || res.data?.data;
+    if (Array.isArray(result)) {
+      clientUserIds = result
         .filter(u => u.role === 'user')
         .map(u => ({ id: u._id, name: u.name, email: u.email, phone: u.phone, gender: u.gender }));
       log('✅', `  Found ${clientUserIds.length} clients`);
+    } else {
+      log('⚠️', '  Unexpected response format for get-user');
     }
   } catch (e) {
-    log('⚠️', '  Could not fetch client list');
+    log('⚠️', '  Could not fetch client list: ' + (e.response?.data?.message || e.message));
   }
 }
 
