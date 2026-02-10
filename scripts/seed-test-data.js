@@ -204,8 +204,17 @@ function log(emoji, msg) {
   console.log(emoji + '  ' + msg);
 }
 
+// Returns YYYY-MM-DD (for appointment API)
 function formatDate(date) {
   return date.toISOString().split('T')[0];
+}
+
+// Returns MM/DD/YYYY (for availability - matches backend moment().format('MM/DD/YYYY'))
+function formatDateMMDDYYYY(date) {
+  var m = String(date.getMonth() + 1).padStart(2, '0');
+  var d = String(date.getDate()).padStart(2, '0');
+  var y = date.getFullYear();
+  return m + '/' + d + '/' + y;
 }
 
 function getDateString(date) {
@@ -907,16 +916,16 @@ async function createClients() {
 async function setupAvailability() {
   log('[AVAILABILITY]', 'Setting up availability for next 2 weeks...');
 
-  // IMPORTANT: day names MUST be lowercase, times MUST be 12-hour AM/PM format
-  // (matching what the mobile app sends in src/app/(salon)/settings/hours.tsx)
+  // IMPORTANT: day names must be 3-letter title-case ("Mon","Tue","Wed") to match
+  // moment().format('ddd') used in event/appointment.event.js:655-656
   var businessHours = {
     slots: [
-      { day: 'monday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
-      { day: 'tuesday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
-      { day: 'wednesday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
-      { day: 'thursday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
-      { day: 'friday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
-      { day: 'saturday', slot: [{ startTime: '9:00 AM', endTime: '5:00 PM' }] },
+      { day: 'Mon', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Tue', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Wed', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Thu', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Fri', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Sat', slot: [{ startTime: '9:00 AM', endTime: '5:00 PM' }] },
     ],
   };
 
@@ -943,7 +952,7 @@ async function setupAvailability() {
 
       try {
         var dayRes = await api.post('/appointment-availability/create-availability-day',
-          { date: formatDate(date) },
+          { date: formatDateMMDDYYYY(date) },
           { params: { offset: OFFSET, stylistId: stylist.id } }
         );
         if (dayRes.data && dayRes.data.status === false) {
@@ -953,7 +962,7 @@ async function setupAvailability() {
         }
         // Log first response for debugging
         if (d === 0) {
-          logResponse('day-availability:' + formatDate(date), dayRes);
+          logResponse('day-availability:' + formatDateMMDDYYYY(date), dayRes);
         }
       } catch (e) {
         dayFail++;
@@ -1104,11 +1113,12 @@ async function createAppointments() {
         if (timeParts[3].toUpperCase() === 'AM' && hour === 12) hour = 0;
         var time24 = String(hour).padStart(2, '0') + ':' + timeParts[2];
 
-        // Match the mobile app salon flow: timeAsADate = current ISO timestamp
+        // timeAsADate must be HH:mm 24hr string matching availability slots
+        // (backend check-availability-of-time.js queries timeData.timeAsADate against "09:00" etc.)
         var aptRes = await api.post('/appointment/add-appointment-from-dashboard', {
           appointmentDate: appointmentDate,
           timeData: {
-            timeAsADate: new Date().toISOString(),
+            timeAsADate: time24,
             timeAsAString: time,
             id: '',
           },
