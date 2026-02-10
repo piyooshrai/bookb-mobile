@@ -285,29 +285,26 @@ async function setupSalonOwner() {
     log('ℹ️', `Login failed: ${e.response?.data?.message || e.message}. Trying signup...`);
   }
 
-  // If login fails, try to create via signup
+  // If login fails, try to create via mobile signup endpoint (public, no auth needed)
   try {
-    const signupRes = await api.post('/users/user-signup', {
+    log('ℹ️', 'Trying mobile signup endpoint...');
+    const signupRes = await api.post('/users/user-signup-for-mobile', {
       name: SALON_OWNER.name,
       email: SALON_OWNER.email,
-      password: SALON_OWNER.password,
       phone: SALON_OWNER.phone,
       countryCode: SALON_OWNER.countryCode,
-      role: SALON_OWNER.role,
       gender: SALON_OWNER.gender,
-      address: SALON_OWNER.address,
-      description: SALON_OWNER.description,
-      packageName: SALON_OWNER.packageName,
-      active: true,
+      salon: '',
+      password: SALON_OWNER.password,
     });
-    logResponse('signup', signupRes);
+    logResponse('mobile-signup', signupRes);
 
-    // Check if signup itself returned a token
+    // Check if signup returned a token
     let token = extractToken(signupRes.data);
     if (token) {
       setToken(token);
       salonId = extractUserId(signupRes.data);
-      log('✅', `Got token from signup. UserID: ${salonId}`);
+      log('✅', `Got token from mobile signup. UserID: ${salonId}`);
     } else {
       // Try logging in after signup
       log('ℹ️', 'No token in signup response, attempting login...');
@@ -340,6 +337,24 @@ async function setupSalonOwner() {
         }
       } catch (ue) {
         log('⚠️', `get-user-by-token failed: ${ue.response?.data?.message || ue.message}`);
+      }
+
+      // Now create the salon entity
+      try {
+        log('ℹ️', 'Creating salon entity...');
+        const salonRes = await api.post('/salon/create-salon', {
+          name: SALON_OWNER.name,
+          address: SALON_OWNER.address,
+          description: SALON_OWNER.description,
+          packageName: SALON_OWNER.packageName,
+        });
+        logResponse('create-salon', salonRes);
+        if (salonRes.data?.data?._id) {
+          salonId = salonRes.data.data._id;
+          log('✅', `Salon created: ${salonId}`);
+        }
+      } catch (se) {
+        log('⚠️', `create-salon: ${se.response?.data?.message || se.message}`);
       }
     }
   } catch (e) {
