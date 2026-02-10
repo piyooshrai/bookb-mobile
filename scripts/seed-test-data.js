@@ -966,6 +966,56 @@ async function setupAvailability() {
     log('[INFO]', '  Day availability for ' + stylist.name + ': ' + dayOk + ' ok, ' + dayFail + ' failed');
     await sleep(300);
   }
+
+  // --- DIAGNOSTIC: Check what availability actually exists ---
+  log('[DIAGNOSTIC]', 'Checking availability after creation...');
+  if (stylistIds.length > 0) {
+    var firstStylist = stylistIds[0];
+
+    // Check business hours
+    try {
+      var bhRes = await api.get('/appointment-availability/get-buiness-hours', {
+        params: { stylistId: firstStylist.id },
+      });
+      log('[DIAGNOSTIC]', '  Business hours for ' + firstStylist.name + ': ' + JSON.stringify(bhRes.data).substring(0, 500));
+    } catch (e) {
+      log('[DIAGNOSTIC]', '  Business hours query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+
+    // Check mobile availability for tomorrow
+    var tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (tomorrow.getDay() === 0) tomorrow.setDate(tomorrow.getDate() + 1); // skip Sunday
+    var tomorrowStr = formatDate(tomorrow);
+    try {
+      var mobileRes = await api.get('/appointment-availability/get-availability-by-stylist-for-mobile', {
+        params: { date: tomorrowStr },
+      });
+      log('[DIAGNOSTIC]', '  Mobile availability for ' + tomorrowStr + ': ' + JSON.stringify(mobileRes.data).substring(0, 500));
+    } catch (e) {
+      log('[DIAGNOSTIC]', '  Mobile availability query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+
+    // Check availability by salon
+    try {
+      var salonAvailRes = await api.get('/appointment-availability/get-availability-by-salon', {
+        params: { pageNumber: 1, pageSize: 5, filterValue: '' },
+      });
+      log('[DIAGNOSTIC]', '  Salon availability: ' + JSON.stringify(salonAvailRes.data).substring(0, 500));
+    } catch (e) {
+      log('[DIAGNOSTIC]', '  Salon availability query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+
+    // Check block status for tomorrow
+    try {
+      var blockRes = await api.get('/appointment-availability/get-appointment-list-with-block-unblock-status', {
+        params: { date: tomorrowStr, offset: OFFSET, stylistId: firstStylist.id },
+      });
+      log('[DIAGNOSTIC]', '  Block status for ' + tomorrowStr + ': ' + JSON.stringify(blockRes.data).substring(0, 500));
+    } catch (e) {
+      log('[DIAGNOSTIC]', '  Block status query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+  }
 }
 
 // --- Step 7: Create Appointments ---
