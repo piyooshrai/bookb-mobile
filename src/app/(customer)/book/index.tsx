@@ -31,17 +31,24 @@ export default function BookAppointment() {
 
   const displayServices = useMemo(() => {
     if (!isDemo && serviceGroupsData) {
-      return serviceGroupsData.flatMap((group) =>
-        group.subServices.map((sub) => ({
-          id: sub._id,
-          name: sub.title,
-          duration: `${sub.requiredTime} min`,
-          price: sub.charges,
-          description: sub.description,
-          category: group.mainService.title,
-          mainServiceId: group.mainService._id,
-        }))
-      );
+      const groups = Array.isArray(serviceGroupsData)
+        ? serviceGroupsData
+        : (serviceGroupsData as any)?.result ?? [];
+      if (groups.length > 0) {
+        return groups.flatMap((group: any) => {
+          const subs = group.subServices || group.subService || [];
+          const main = group.mainService || group.category || {};
+          return subs.map((sub: any) => ({
+            id: sub._id,
+            name: sub.title,
+            duration: `${sub.requiredTime} min`,
+            price: sub.charges,
+            description: sub.description,
+            category: main.title || 'Service',
+            mainServiceId: main._id || '',
+          }));
+        });
+      }
     }
     return MOCK_SERVICES.map((s) => ({ ...s, mainServiceId: '' }));
   }, [isDemo, serviceGroupsData]);

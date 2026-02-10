@@ -270,37 +270,60 @@ async function cleanupExistingData() {
   // --- Delete all appointments ---
   log('[CLEANUP]', '  Deleting appointments...');
   var appointmentsDeleted = 0;
+
+  // First get all stylists so we can query appointments per-stylist
+  var cleanupStylistList = [];
   try {
-    var today = new Date();
-    var fromDate = new Date(today);
-    fromDate.setDate(today.getDate() - 30);
-    var toDate = new Date(today);
-    toDate.setDate(today.getDate() + 30);
-    var res = await api.post('/appointment/get-appointment-from-dashboard', {
-      salon: salonId,
-      fromDate: formatDate(fromDate),
-      toDate: formatDate(toDate),
-      offset: OFFSET,
-    });
-    var appointments = res.data && res.data.data;
-    if (Array.isArray(appointments) && appointments.length > 0) {
-      log('[INFO]', '    Found ' + appointments.length + ' appointments to delete');
-      for (var i = 0; i < appointments.length; i++) {
-        var apt = appointments[i];
-        try {
-          await api.delete('/appointment/delete-appointment-dashboard/' + apt._id);
-          appointmentsDeleted++;
-        } catch (e) {
-          try {
-            await api.delete('/appointment/delete-appointment', { params: { appointmentId: apt._id } });
-            appointmentsDeleted++;
-          } catch (e2) { /* skip */ }
-        }
-        await sleep(100);
-      }
+    var stylistRes0 = await api.get('/stylist/get-stylist-by-salon');
+    var stylistData = stylistRes0.data && stylistRes0.data.data;
+    if (Array.isArray(stylistData)) {
+      cleanupStylistList = stylistData;
+    } else if (stylistData && stylistData.result) {
+      cleanupStylistList = stylistData.result;
     }
-  } catch (e) {
-    log('[WARN]', '    Appointment fetch failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+  } catch (e) { /* no stylists yet */ }
+
+  // get-appointment-from-dashboard requires stylistId in body and offset in query string
+  var today = new Date();
+  var fromDate = new Date(today);
+  fromDate.setDate(today.getDate() - 30);
+  var toDate = new Date(today);
+  toDate.setDate(today.getDate() + 30);
+
+  for (var si0 = 0; si0 < cleanupStylistList.length; si0++) {
+    var cleanStylist = cleanupStylistList[si0];
+    try {
+      var res = await api.post('/appointment/get-appointment-from-dashboard',
+        {
+          stylistId: cleanStylist._id,
+          fromDate: formatDateMMDDYYYY(fromDate),
+          toDate: formatDateMMDDYYYY(toDate),
+        },
+        { params: { offset: OFFSET } }
+      );
+      var appointments = res.data && res.data.data;
+      if (!Array.isArray(appointments)) {
+        appointments = (res.data && res.data.result) || [];
+      }
+      if (Array.isArray(appointments) && appointments.length > 0) {
+        log('[INFO]', '    Found ' + appointments.length + ' appointments for ' + (cleanStylist.name || cleanStylist._id));
+        for (var i = 0; i < appointments.length; i++) {
+          var apt = appointments[i];
+          try {
+            await api.delete('/appointment/delete-appointment-dashboard/' + apt._id);
+            appointmentsDeleted++;
+          } catch (e) {
+            try {
+              await api.delete('/appointment/delete-appointment', { params: { appointmentId: apt._id } });
+              appointmentsDeleted++;
+            } catch (e2) { /* skip */ }
+          }
+          await sleep(100);
+        }
+      }
+    } catch (e) {
+      log('[WARN]', '    Appointment fetch failed for stylist: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
   }
 
   // Also try fetching by each stylist in case dashboard query missed some
@@ -1098,8 +1121,8 @@ async function createAppointments() {
   var created = 0;
   var failed = 0;
 
-  // Create 3-5 appointments per day for the next 14 days
-  for (var d = 0; d < 14; d++) {
+  // Create 3-5 appointments per day for the next 14 days (start from tomorrow)
+  for (var d = 1; d < 14; d++) {
     var date = new Date(today);
     date.setDate(today.getDate() + d);
     if (date.getDay() === 0) continue; // Skip Sundays
@@ -1132,7 +1155,7 @@ async function createAppointments() {
       }
 
       try {
-        var appointmentDate = formatDate(date);
+        var appointmentDate = formatDateMMDDYYYY(date);
         // Convert time string to 24h for API
         var timeParts = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
         var hour = parseInt(timeParts[1]);
@@ -1169,8 +1192,18 @@ async function createAppointments() {
           failed++;
         } else {
           created++;
+          var newAptId = aptRes.data && aptRes.data.data && aptRes.data.data.appointmentId;
           if (created <= 3) {
             logResponse('appointment:' + getDateString(date), aptRes);
+          }
+          // After first successful appointment, fetch its detail to see stored data
+          if (created === 1 && newAptId) {
+            try {
+              var detailRes = await api.get('/appointment/get-appointment-detail', { params: { appointmentId: newAptId } });
+              log('[DIAGNOSTIC]', '  Stored appointment detail: ' + JSON.stringify(detailRes.data).substring(0, 800));
+            } catch (de) {
+              log('[WARN]', '  Could not fetch appointment detail: ' + ((de.response && de.response.data && de.response.data.message) || de.message));
+            }
           }
           log('[OK]', '  ' + getDateString(date) + ' ' + time + ' - ' + client.name + ' -> ' + service.title + ' with ' + stylist.name);
         }
@@ -1191,57 +1224,40 @@ async function verifyAppointments() {
   log('[VERIFY]', 'Verifying appointments are queryable...');
 
   var today = new Date();
-  var fromDate = formatDate(today);
+  var fromDate = formatDateMMDDYYYY(today);
   var toDate = new Date(today);
   toDate.setDate(today.getDate() + 14);
-  var toDateStr = formatDate(toDate);
+  var toDateStr = formatDateMMDDYYYY(toDate);
 
   // Query 1: get-appointment-from-dashboard
-  try {
-    var res = await api.post('/appointment/get-appointment-from-dashboard', {
-      salon: salonId,
-      fromDate: fromDate,
-      toDate: toDateStr,
-      offset: OFFSET,
-    });
-    var appointments = res.data && res.data.data;
-    if (Array.isArray(appointments)) {
-      log('[OK]', '  Dashboard query: ' + appointments.length + ' appointments found (' + fromDate + ' to ' + toDateStr + ')');
-      if (appointments.length > 0) {
-        var apt = appointments[0];
-        log('[INFO]', '  Sample: ' + apt.dateAsAString + ' ' + apt.timeAsAString + ' | status=' + apt.status + ' | offset=' + apt.offset);
-      }
-    } else {
-      log('[WARN]', '  Dashboard query returned non-array: ' + JSON.stringify(res.data).substring(0, 300));
-    }
-  } catch (e) {
-    log('[WARN]', '  Dashboard query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
-  }
-
-  // Query 2: get-appointment-by-stylist
-  if (stylistIds.length > 0) {
+  // Backend requires: stylistId in body, offset in query string (NOT body)
+  var totalFound = 0;
+  for (var vi = 0; vi < stylistIds.length; vi++) {
     try {
-      var res2 = await api.get('/appointment/get-appointment-by-stylist', {
-        params: { pageNumber: 1, pageSize: 10, stylistId: stylistIds[0].id },
-      });
-      var data = res2.data && res2.data.data;
-      var count = (data && data.result && data.result.length) || 0;
-      var total = (data && data.totalPageSize) || 0;
-      log('[OK]', '  Stylist query (' + stylistIds[0].name + '): ' + count + ' appointments (' + total + ' total pages)');
+      var res = await api.post('/appointment/get-appointment-from-dashboard',
+        {
+          stylistId: stylistIds[vi].id,
+          fromDate: fromDate,
+          toDate: toDateStr,
+        },
+        { params: { offset: OFFSET } }
+      );
+      var appointments = res.data && res.data.data;
+      if (!Array.isArray(appointments)) {
+        appointments = (res.data && res.data.result) || [];
+      }
+      totalFound += appointments.length;
+      log('[OK]', '  Dashboard (' + stylistIds[vi].name + '): ' + appointments.length + ' appointments');
+      if (appointments.length > 0 && vi === 0) {
+        log('[INFO]', '  Sample: ' + JSON.stringify(appointments[0]).substring(0, 300));
+      }
     } catch (e) {
-      log('[WARN]', '  Stylist query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+      log('[WARN]', '  Dashboard query failed for ' + stylistIds[vi].name + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
   }
+  log('[OK]', '  Total appointments found across all stylists: ' + totalFound);
 
-  // Query 3: KPI endpoints
-  try {
-    var convRes = await api.get('/appointment/appointment-conversion-rate', { params: { salon: salonId } });
-    log('[INFO]', '  Conversion rate: ' + JSON.stringify(convRes.data && convRes.data.data));
-  } catch (e) {
-    log('[WARN]', '  Conversion rate: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
-  }
-
-  // Query 4: getAppointmentsByMonth
+  // Query 2: KPI endpoints (uses JWT token, no query params needed)
   try {
     var monthRes = await api.get('/salon/getAppointmentsByMonth/' + salonId);
     log('[INFO]', '  Appointments by month: ' + JSON.stringify(monthRes.data && monthRes.data.data).substring(0, 200));
