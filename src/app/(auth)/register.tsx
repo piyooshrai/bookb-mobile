@@ -14,8 +14,30 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useLogin } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
+import { UserRole } from '@/api/types';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+
+function navigateByRole(router: ReturnType<typeof useRouter>, role: UserRole | null) {
+  switch (role) {
+    case 'salon':
+    case 'manager':
+      router.replace('/(salon)/');
+      break;
+    case 'stylist':
+      router.replace('/(stylist)/');
+      break;
+    case 'admin':
+    case 'superadmin':
+      router.replace('/(admin)/');
+      break;
+    case 'user':
+    default:
+      router.replace('/(customer)/');
+      break;
+  }
+}
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -35,11 +57,13 @@ export default function RegisterScreen() {
 
     try {
       await loginMutation.mutateAsync({ email, password });
+      const currentRole = useAuthStore.getState().role;
+      navigateByRole(router, currentRole);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed';
       setError(message);
     }
-  }, [email, password, loginMutation]);
+  }, [email, password, loginMutation, router]);
 
   return (
     <LinearGradient

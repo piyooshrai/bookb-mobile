@@ -7,7 +7,7 @@ export const fontFamilies = {
   headingItalic: 'PlayfairDisplay_700Bold_Italic',
   body: 'DMSans_400Regular',
   bodyMedium: 'DMSans_500Medium',
-  bodySemiBold: 'DMSans_700Bold',
+  bodySemiBold: 'DMSans_600SemiBold',
   bodyBold: 'DMSans_700Bold',
 } as const;
 

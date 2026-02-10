@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,17 +12,48 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useVerifyOtp } from '@/hooks/useAuth';
+import { useVerifyOtp, useCheckMobile } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
+import { UserRole } from '@/api/types';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+
+function navigateByRole(router: ReturnType<typeof useRouter>, role: UserRole | null) {
+  switch (role) {
+    case 'salon':
+    case 'manager':
+      router.replace('/(salon)/');
+      break;
+    case 'stylist':
+      router.replace('/(stylist)/');
+      break;
+    case 'admin':
+    case 'superadmin':
+      router.replace('/(admin)/');
+      break;
+    case 'user':
+    default:
+      router.replace('/(customer)/');
+      break;
+  }
+}
 
 export default function OtpScreen() {
   const router = useRouter();
   const { phone, countryCode } = useLocalSearchParams<{ phone: string; countryCode: string }>();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState('');
+  const [resendCountdown, setResendCountdown] = useState(40);
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const verifyOtp = useVerifyOtp();
+  const checkMobile = useCheckMobile();
+  const role = useAuthStore((s) => s.role);
+
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const timer = setTimeout(() => setResendCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
 
   const handleOtpChange = useCallback(
     (value: string, index: number) => {
@@ -65,11 +96,33 @@ export default function OtpScreen() {
         deviceInfo: Platform.OS,
         deviceId: '',
       });
+      // After successful verification, useVerifyOtp stores the token/user/role
+      // Read role from store and navigate
+      const currentRole = useAuthStore.getState().role;
+      navigateByRole(router, currentRole);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Invalid verification code';
       setError(message);
     }
-  }, [otp, phone, verifyOtp]);
+  }, [otp, phone, verifyOtp, router]);
+
+  const handleResend = useCallback(async () => {
+    if (resendCountdown > 0) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setError('');
+    try {
+      await checkMobile.mutateAsync({
+        data: { phone: phone || '', countryCode: countryCode || '+44' },
+        packageName: 'com.bookb.app',
+      });
+      setResendCountdown(40);
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to resend code';
+      setError(message);
+    }
+  }, [resendCountdown, phone, countryCode, checkMobile]);
 
   return (
     <LinearGradient
@@ -132,8 +185,14 @@ export default function OtpScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.resendButton}>
-              <Text style={styles.resendText}>Resend Code</Text>
+            <TouchableOpacity
+              style={styles.resendButton}
+              onPress={handleResend}
+              disabled={resendCountdown > 0}
+            >
+              <Text style={[styles.resendText, resendCountdown > 0 && styles.resendDisabled]}>
+                {resendCountdown > 0 ? `Resend Code (${resendCountdown}s)` : 'Resend Code'}
+              </Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -216,5 +275,8 @@ const styles = StyleSheet.create({
     color: colors.gold,
     fontSize: 13,
     fontFamily: fontFamilies.bodySemiBold,
+  },
+  resendDisabled: {
+    color: '#5c564e',
   },
 });
