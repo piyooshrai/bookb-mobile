@@ -976,6 +976,33 @@ async function setupAvailability() {
     await sleep(300);
   }
 
+  // IMPORTANT: create-availability-bulk fires an async event that processes in background.
+  // We must wait for the backend to finish creating all availability records before
+  // attempting to create appointments. Without this wait, early dates will fail.
+  log('[AVAILABILITY]', '  Waiting 15 seconds for async availability processing to complete...');
+  await sleep(15000);
+
+  // Verify availability was created by checking a sample date
+  if (stylistIds.length > 0) {
+    var checkDate = new Date();
+    checkDate.setDate(checkDate.getDate() + 7); // check a date 1 week from now
+    if (checkDate.getDay() === 0) checkDate.setDate(checkDate.getDate() + 1);
+    try {
+      var checkRes = await api.get('/appointment-availability/get-appointment-list-with-block-unblock-status', {
+        params: { date: formatDate(checkDate), offset: OFFSET, stylistId: stylistIds[0].id },
+      });
+      var checkData = checkRes.data && checkRes.data.data;
+      var slotCount = Array.isArray(checkData) ? checkData.length : 0;
+      log('[AVAILABILITY]', '  Verification: ' + slotCount + ' slots found for ' + formatDate(checkDate) + ' (' + stylistIds[0].name + ')');
+      if (slotCount === 0) {
+        log('[WARN]', '  No slots found yet - waiting 10 more seconds...');
+        await sleep(10000);
+      }
+    } catch (e) {
+      log('[WARN]', '  Verification failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+  }
+
   // --- DIAGNOSTIC: Check what availability actually exists ---
   log('[DIAGNOSTIC]', 'Checking availability after creation...');
   if (stylistIds.length > 0) {
