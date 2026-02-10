@@ -252,6 +252,200 @@ function extractUserId(data) {
   return null;
 }
 
+// ─── Step 0: Clean Up Existing Data ──────────────────────────────────────────
+
+async function cleanupExistingData() {
+  log('🧹', 'Cleaning up existing data from previous runs...');
+
+  // --- Delete all appointments ---
+  log('🧹', '  Deleting appointments...');
+  let appointmentsDeleted = 0;
+  try {
+    // Fetch appointments over a wide range
+    const today = new Date();
+    const fromDate = new Date(today);
+    fromDate.setDate(today.getDate() - 30);
+    const toDate = new Date(today);
+    toDate.setDate(today.getDate() + 30);
+    const res = await api.post('/appointment/get-appointment-from-dashboard', {
+      salon: salonId,
+      fromDate: formatDate(fromDate),
+      toDate: formatDate(toDate),
+      offset: OFFSET,
+    });
+    const appointments = res.data?.data;
+    if (Array.isArray(appointments) && appointments.length > 0) {
+      log('ℹ️', `    Found ${appointments.length} appointments to delete`);
+      for (const apt of appointments) {
+        try {
+          await api.delete(`/appointment/delete-appointment-dashboard/${apt._id}`);
+          appointmentsDeleted++;
+        } catch (e) {
+          // Try alternate endpoint
+          try {
+            await api.delete('/appointment/delete-appointment', { params: { appointmentId: apt._id } });
+            appointmentsDeleted++;
+          } catch (e2) { /* skip */ }
+        }
+        await sleep(100);
+      }
+    }
+  } catch (e) {
+    log('⚠️', `    Appointment fetch failed: ${e.response?.data?.message || e.message}`);
+  }
+  // Also try fetching by each stylist in case dashboard query missed some
+  try {
+    const stylistRes = await api.get('/stylist/get-stylist-by-salon');
+    const stylists = stylistRes.data?.data;
+    const stylistList = Array.isArray(stylists) ? stylists : stylists?.result || [];
+    for (const sty of stylistList) {
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        try {
+          const res = await api.get('/appointment/get-appointment-by-stylist', {
+            params: { pageNumber: page, pageSize: 50, stylistId: sty._id },
+          });
+          const result = res.data?.data?.result || [];
+          if (result.length === 0) { hasMore = false; break; }
+          for (const apt of result) {
+            try {
+              await api.delete(`/appointment/delete-appointment-dashboard/${apt._id}`);
+              appointmentsDeleted++;
+            } catch (e) {
+              try {
+                await api.delete('/appointment/delete-appointment', { params: { appointmentId: apt._id } });
+                appointmentsDeleted++;
+              } catch (e2) { /* skip */ }
+            }
+            await sleep(50);
+          }
+          page++;
+          if (page > 20) break; // safety limit
+        } catch (e) { hasMore = false; }
+      }
+    }
+  } catch (e) { /* no stylists yet, that's fine */ }
+  log('✅', `    Deleted ${appointmentsDeleted} appointments`);
+
+  // --- Delete all sub-services then main services ---
+  log('🧹', '  Deleting services...');
+  let servicesDeleted = 0;
+  try {
+    const res = await api.get('/service/get-service-groupby-category');
+    const groups = res.data?.data?.result || res.data?.data || [];
+    if (Array.isArray(groups)) {
+      // Delete sub-services first
+      for (const group of groups) {
+        const subs = group.subService || group.subServices || [];
+        for (const sub of subs) {
+          try {
+            await api.delete('/service/delete-service', { params: { serviceId: sub._id } });
+            servicesDeleted++;
+          } catch (e) { /* skip */ }
+          await sleep(50);
+        }
+      }
+      // Then delete main services
+      for (const group of groups) {
+        const mainId = group.category?._id || group.mainService?._id || group._id;
+        if (mainId) {
+          try {
+            await api.delete('/service/delete-service', { params: { serviceId: mainId } });
+            servicesDeleted++;
+          } catch (e) { /* skip */ }
+          await sleep(50);
+        }
+      }
+    }
+  } catch (e) {
+    // Fallback: try paginated endpoint
+    try {
+      const res = await api.get('/service/get-main-service', { params: { pageNumber: 1, pageSize: 100, filterValue: '' } });
+      const mainServices = res.data?.data?.result || [];
+      for (const svc of mainServices) {
+        // Delete sub-services for this main service
+        try {
+          const subRes = await api.get('/service/get-enable-sub-service', { params: { mainServiceId: svc._id } });
+          const subs = subRes.data?.data || [];
+          for (const sub of subs) {
+            try { await api.delete('/service/delete-service', { params: { serviceId: sub._id } }); servicesDeleted++; } catch (e2) { /* skip */ }
+            await sleep(50);
+          }
+        } catch (e2) { /* skip */ }
+        try { await api.delete('/service/delete-service', { params: { serviceId: svc._id } }); servicesDeleted++; } catch (e2) { /* skip */ }
+        await sleep(50);
+      }
+    } catch (e2) {
+      log('⚠️', `    Service cleanup failed: ${e2.response?.data?.message || e2.message}`);
+    }
+  }
+  log('✅', `    Deleted ${servicesDeleted} services`);
+
+  // --- Delete all products then categories ---
+  log('🧹', '  Deleting products and categories...');
+  let productsDeleted = 0;
+  let categoriesDeleted = 0;
+  // Delete products first
+  try {
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      const res = await api.get('/product/get-product-by-salon', { params: { pageNumber: page, pageSize: 50, filterValue: '' } });
+      const products = res.data?.data?.result || [];
+      if (products.length === 0) { hasMore = false; break; }
+      for (const prod of products) {
+        try { await api.delete('/product/delete-product', { params: { productId: prod._id } }); productsDeleted++; } catch (e) { /* skip */ }
+        await sleep(50);
+      }
+      page++;
+      if (page > 10) break;
+    }
+  } catch (e) {
+    log('⚠️', `    Product fetch failed: ${e.response?.data?.message || e.message}`);
+  }
+  // Then delete categories
+  try {
+    const res = await api.get('/product/get-category', { params: { pageNumber: 1, pageSize: 100, filterValue: '' } });
+    const categories = res.data?.data?.result || res.data?.data || [];
+    if (Array.isArray(categories)) {
+      for (const cat of categories) {
+        try { await api.delete('/product/delete-category', { params: { categoryId: cat._id } }); categoriesDeleted++; } catch (e) { /* skip */ }
+        await sleep(50);
+      }
+    }
+  } catch (e) {
+    log('⚠️', `    Category fetch failed: ${e.response?.data?.message || e.message}`);
+  }
+  log('✅', `    Deleted ${productsDeleted} products, ${categoriesDeleted} categories`);
+
+  // --- Delete client users (role=user only, NOT stylists or salon owner) ---
+  log('🧹', '  Deleting client accounts...');
+  let clientsDeleted = 0;
+  try {
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      const res = await api.get('/users/get-user', { params: { pageNumber: page, pageSize: 50, filterValue: '' } });
+      const users = res.data?.data?.result || [];
+      if (users.length === 0) { hasMore = false; break; }
+      for (const u of users) {
+        if (u.role === 'user' && u._id !== salonId) {
+          try { await api.delete('/users/delete-user', { params: { userID: u._id } }); clientsDeleted++; } catch (e) { /* skip */ }
+          await sleep(50);
+        }
+      }
+      page++;
+      if (page > 10) break;
+    }
+  } catch (e) {
+    log('⚠️', `    User fetch failed: ${e.response?.data?.message || e.message}`);
+  }
+  log('✅', `    Deleted ${clientsDeleted} clients`);
+
+  log('🧹', `  Cleanup complete: ${appointmentsDeleted} appointments, ${servicesDeleted} services, ${productsDeleted} products, ${categoriesDeleted} categories, ${clientsDeleted} clients`);
+}
+
 // ─── Step 1: Create/Login Salon Owner ────────────────────────────────────────
 
 async function setupSalonOwner() {
@@ -965,6 +1159,7 @@ async function main() {
 
   try {
     await setupSalonOwner();
+    await cleanupExistingData();
     await createStylists();
     await createServices();
     await createProducts();
