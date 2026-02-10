@@ -13,25 +13,27 @@
  *
  * The script will:
  *   1. Create a salon owner account (or login if exists)
- *   2. Create 3 stylists
- *   3. Create service categories and services
- *   4. Create product categories and products
- *   5. Create client accounts
- *   6. Set up availability for next 2 weeks
- *   7. Create appointments spread across 2 weeks
- *   8. Print all login credentials
+ *   2. CLEAN UP all existing data from previous runs
+ *   3. Create 3 stylists
+ *   4. Create service categories and services
+ *   5. Create product categories and products
+ *   6. Create client accounts
+ *   7. Set up availability for next 2 weeks
+ *   8. Create appointments spread across 2 weeks
+ *   9. Verify appointments show on dashboard
+ *   10. Print all login credentials
  */
 
-const axios = require('axios');
+var axios = require('axios');
 
-const API_BASE = 'https://bookb.the-algo.com/api/v1';
+var API_BASE = 'https://bookb.the-algo.com/api/v1';
 // Miami EST = UTC-5 = offset 300. Use your local offset if running from a different timezone.
 // NOTE: new Date().getTimezoneOffset() returns 0 on servers/containers (UTC), which breaks
 // appointment date calculations. Hardcode to Miami EST for this salon.
-const OFFSET = 300;
+var OFFSET = 300;
 
-// ─── Credentials ────────────────────────────────────────────────────────────
-const SALON_OWNER = {
+// --- Credentials ---
+var SALON_OWNER = {
   name: 'Sophia Chen',
   salonName: 'Luxe',
   email: 'sophia.chen@bookb.app',
@@ -45,7 +47,7 @@ const SALON_OWNER = {
   packageName: 'com.bookb.app',
 };
 
-const STYLISTS = [
+var STYLISTS = [
   {
     name: 'Isabella Torres',
     email: 'isabella@luxemiami.com',
@@ -84,7 +86,7 @@ const STYLISTS = [
   },
 ];
 
-const CLIENTS = [
+var CLIENTS = [
   { name: 'Ana Martinez', email: 'ana.m@gmail.com', phone: '3055550301', countryCode: '+1', gender: 'female' },
   { name: 'David Park', email: 'david.park@gmail.com', phone: '3055550302', countryCode: '+1', gender: 'male' },
   { name: 'Emily Watson', email: 'emily.watson@gmail.com', phone: '3055550303', countryCode: '+1', gender: 'female' },
@@ -95,7 +97,7 @@ const CLIENTS = [
   { name: 'Daniel Kim', email: 'daniel.kim@gmail.com', phone: '3055550308', countryCode: '+1', gender: 'male' },
 ];
 
-const SERVICE_CATEGORIES = [
+var SERVICE_CATEGORIES = [
   {
     title: 'Hair Cutting',
     description: 'Professional cutting services',
@@ -156,7 +158,7 @@ const SERVICE_CATEGORIES = [
   },
 ];
 
-const PRODUCT_CATEGORIES = [
+var PRODUCT_CATEGORIES = [
   { categoryName: 'Shampoo' },
   { categoryName: 'Conditioner' },
   { categoryName: 'Styling Products' },
@@ -164,7 +166,7 @@ const PRODUCT_CATEGORIES = [
   { categoryName: 'Tools & Accessories' },
 ];
 
-const PRODUCTS = [
+var PRODUCTS = [
   { productName: 'Olaplex No.4 Bond Maintenance Shampoo', productDescription: 'Repairs and maintains bonds while gently cleansing. Sulfate-free formula for all hair types.', productPrice: 28, category: 'Shampoo', stock: 24, actualPrice: 32 },
   { productName: 'Moroccanoil Moisture Repair Shampoo', productDescription: 'Strengthens and restores with argan oil and keratin.', productPrice: 24, category: 'Shampoo', stock: 18, actualPrice: 28 },
   { productName: 'Olaplex No.5 Bond Maintenance Conditioner', productDescription: 'Restores, repairs, and hydrates without weighing hair down.', productPrice: 28, category: 'Conditioner', stock: 22, actualPrice: 32 },
@@ -177,17 +179,17 @@ const PRODUCTS = [
   { productName: 'Mason Pearson Pocket Bristle Brush', productDescription: 'Handcrafted boar bristle brush for daily grooming.', productPrice: 115, category: 'Tools & Accessories', stock: 6, actualPrice: 130 },
 ];
 
-// ─── Helper functions ───────────────────────────────────────────────────────
+// --- Helper functions ---
 
-let salonToken = null;
-let salonId = null;
-let stylistIds = [];
-let serviceIds = []; // { mainId, subIds: [] }
-let subServiceFlatList = []; // all sub-service IDs
-let categoryMap = {}; // categoryName -> categoryId
-let clientUserIds = [];
+var salonToken = null;
+var salonId = null;
+var stylistIds = [];
+var serviceIds = [];
+var subServiceFlatList = [];
+var categoryMap = {};
+var clientUserIds = [];
 
-const api = axios.create({
+var api = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
@@ -199,7 +201,7 @@ function setToken(token) {
 }
 
 function log(emoji, msg) {
-  console.log(`${emoji}  ${msg}`);
+  console.log(emoji + '  ' + msg);
 }
 
 function formatDate(date) {
@@ -207,12 +209,12 @@ function formatDate(date) {
 }
 
 function getDateString(date) {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+  var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
 }
 
 // Time slots for appointments
-const TIME_SLOTS = [
+var TIME_SLOTS = [
   '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
   '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM',
   '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM', '05:00 PM',
@@ -222,66 +224,64 @@ function randomPick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function sleep(ms) {
+  return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
-// ─── Debug helper ─────────────────────────────────────────────────────────────
+// --- Debug helper ---
 
 function logResponse(label, res) {
-  console.log(`  [DEBUG ${label}] status=${res.status}, body=${JSON.stringify(res.data).substring(0, 500)}`);
+  console.log('  [DEBUG ' + label + '] status=' + res.status + ', body=' + JSON.stringify(res.data).substring(0, 500));
 }
 
-// ─── Try to extract token from any API response ──────────────────────────────
+// --- Try to extract token from any API response ---
 
 function extractToken(data) {
-  // Try common locations where token might appear
-  if (data?.data?.token) return data.data.token;
-  if (data?.token) return data.token;
-  if (data?.data?.accessToken) return data.data.accessToken;
+  if (data && data.data && data.data.token) return data.data.token;
+  if (data && data.token) return data.token;
+  if (data && data.data && data.data.accessToken) return data.data.accessToken;
   return null;
 }
 
 function extractUserId(data) {
-  if (data?.userid) return data.userid;
-  if (data?.userId) return data.userId;
-  if (data?.data?.userid) return data.data.userid;
-  if (data?.data?.userId) return data.data.userId;
-  if (data?.data?._id) return data.data._id;
-  if (data?.data?.user?._id) return data.data.user._id;
+  if (data && data.userid) return data.userid;
+  if (data && data.userId) return data.userId;
+  if (data && data.data && data.data.userid) return data.data.userid;
+  if (data && data.data && data.data.userId) return data.data.userId;
+  if (data && data.data && data.data._id) return data.data._id;
+  if (data && data.data && data.data.user && data.data.user._id) return data.data.user._id;
   return null;
 }
 
-// ─── Step 0: Clean Up Existing Data ──────────────────────────────────────────
+// --- Step 0: Clean Up Existing Data ---
 
 async function cleanupExistingData() {
-  log('🧹', 'Cleaning up existing data from previous runs...');
+  log('[CLEANUP]', 'Cleaning up existing data from previous runs...');
 
   // --- Delete all appointments ---
-  log('🧹', '  Deleting appointments...');
-  let appointmentsDeleted = 0;
+  log('[CLEANUP]', '  Deleting appointments...');
+  var appointmentsDeleted = 0;
   try {
-    // Fetch appointments over a wide range
-    const today = new Date();
-    const fromDate = new Date(today);
+    var today = new Date();
+    var fromDate = new Date(today);
     fromDate.setDate(today.getDate() - 30);
-    const toDate = new Date(today);
+    var toDate = new Date(today);
     toDate.setDate(today.getDate() + 30);
-    const res = await api.post('/appointment/get-appointment-from-dashboard', {
+    var res = await api.post('/appointment/get-appointment-from-dashboard', {
       salon: salonId,
       fromDate: formatDate(fromDate),
       toDate: formatDate(toDate),
       offset: OFFSET,
     });
-    const appointments = res.data?.data;
+    var appointments = res.data && res.data.data;
     if (Array.isArray(appointments) && appointments.length > 0) {
-      log('ℹ️', `    Found ${appointments.length} appointments to delete`);
-      for (const apt of appointments) {
+      log('[INFO]', '    Found ' + appointments.length + ' appointments to delete');
+      for (var i = 0; i < appointments.length; i++) {
+        var apt = appointments[i];
         try {
-          await api.delete(`/appointment/delete-appointment-dashboard/${apt._id}`);
+          await api.delete('/appointment/delete-appointment-dashboard/' + apt._id);
           appointmentsDeleted++;
         } catch (e) {
-          // Try alternate endpoint
           try {
             await api.delete('/appointment/delete-appointment', { params: { appointmentId: apt._id } });
             appointmentsDeleted++;
@@ -291,64 +291,69 @@ async function cleanupExistingData() {
       }
     }
   } catch (e) {
-    log('⚠️', `    Appointment fetch failed: ${e.response?.data?.message || e.message}`);
+    log('[WARN]', '    Appointment fetch failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
+
   // Also try fetching by each stylist in case dashboard query missed some
   try {
-    const stylistRes = await api.get('/stylist/get-stylist-by-salon');
-    const stylists = stylistRes.data?.data;
-    const stylistList = Array.isArray(stylists) ? stylists : stylists?.result || [];
-    for (const sty of stylistList) {
-      let page = 1;
-      let hasMore = true;
+    var stylistRes = await api.get('/stylist/get-stylist-by-salon');
+    var stylists = stylistRes.data && stylistRes.data.data;
+    var stylistList = Array.isArray(stylists) ? stylists : (stylists && stylists.result ? stylists.result : []);
+    for (var si = 0; si < stylistList.length; si++) {
+      var sty = stylistList[si];
+      var page = 1;
+      var hasMore = true;
       while (hasMore) {
         try {
-          const res = await api.get('/appointment/get-appointment-by-stylist', {
+          var res2 = await api.get('/appointment/get-appointment-by-stylist', {
             params: { pageNumber: page, pageSize: 50, stylistId: sty._id },
           });
-          const result = res.data?.data?.result || [];
+          var result = (res2.data && res2.data.data && res2.data.data.result) || [];
           if (result.length === 0) { hasMore = false; break; }
-          for (const apt of result) {
+          for (var ri = 0; ri < result.length; ri++) {
+            var apt2 = result[ri];
             try {
-              await api.delete(`/appointment/delete-appointment-dashboard/${apt._id}`);
+              await api.delete('/appointment/delete-appointment-dashboard/' + apt2._id);
               appointmentsDeleted++;
             } catch (e) {
               try {
-                await api.delete('/appointment/delete-appointment', { params: { appointmentId: apt._id } });
+                await api.delete('/appointment/delete-appointment', { params: { appointmentId: apt2._id } });
                 appointmentsDeleted++;
               } catch (e2) { /* skip */ }
             }
             await sleep(50);
           }
           page++;
-          if (page > 20) break; // safety limit
+          if (page > 20) break;
         } catch (e) { hasMore = false; }
       }
     }
-  } catch (e) { /* no stylists yet, that's fine */ }
-  log('✅', `    Deleted ${appointmentsDeleted} appointments`);
+  } catch (e) { /* no stylists yet, fine */ }
+  log('[OK]', '    Deleted ' + appointmentsDeleted + ' appointments');
 
   // --- Delete all sub-services then main services ---
-  log('🧹', '  Deleting services...');
-  let servicesDeleted = 0;
+  log('[CLEANUP]', '  Deleting services...');
+  var servicesDeleted = 0;
   try {
-    const res = await api.get('/service/get-service-groupby-category');
-    const groups = res.data?.data?.result || res.data?.data || [];
+    var svcRes = await api.get('/service/get-service-groupby-category');
+    var groups = (svcRes.data && svcRes.data.data && svcRes.data.data.result) || (svcRes.data && svcRes.data.data) || [];
     if (Array.isArray(groups)) {
       // Delete sub-services first
-      for (const group of groups) {
-        const subs = group.subService || group.subServices || [];
-        for (const sub of subs) {
+      for (var gi = 0; gi < groups.length; gi++) {
+        var group = groups[gi];
+        var subs = group.subService || group.subServices || [];
+        for (var sbi = 0; sbi < subs.length; sbi++) {
           try {
-            await api.delete('/service/delete-service', { params: { serviceId: sub._id } });
+            await api.delete('/service/delete-service', { params: { serviceId: subs[sbi]._id } });
             servicesDeleted++;
           } catch (e) { /* skip */ }
           await sleep(50);
         }
       }
       // Then delete main services
-      for (const group of groups) {
-        const mainId = group.category?._id || group.mainService?._id || group._id;
+      for (var gi2 = 0; gi2 < groups.length; gi2++) {
+        var group2 = groups[gi2];
+        var mainId = (group2.category && group2.category._id) || (group2.mainService && group2.mainService._id) || group2._id;
         if (mainId) {
           try {
             await api.delete('/service/delete-service', { params: { serviceId: mainId } });
@@ -361,15 +366,15 @@ async function cleanupExistingData() {
   } catch (e) {
     // Fallback: try paginated endpoint
     try {
-      const res = await api.get('/service/get-main-service', { params: { pageNumber: 1, pageSize: 100, filterValue: '' } });
-      const mainServices = res.data?.data?.result || [];
-      for (const svc of mainServices) {
-        // Delete sub-services for this main service
+      var mainRes = await api.get('/service/get-main-service', { params: { pageNumber: 1, pageSize: 100, filterValue: '' } });
+      var mainServices = (mainRes.data && mainRes.data.data && mainRes.data.data.result) || [];
+      for (var mi = 0; mi < mainServices.length; mi++) {
+        var svc = mainServices[mi];
         try {
-          const subRes = await api.get('/service/get-enable-sub-service', { params: { mainServiceId: svc._id } });
-          const subs = subRes.data?.data || [];
-          for (const sub of subs) {
-            try { await api.delete('/service/delete-service', { params: { serviceId: sub._id } }); servicesDeleted++; } catch (e2) { /* skip */ }
+          var subRes = await api.get('/service/get-enable-sub-service', { params: { mainServiceId: svc._id } });
+          var subs2 = (subRes.data && subRes.data.data) || [];
+          for (var sbi2 = 0; sbi2 < subs2.length; sbi2++) {
+            try { await api.delete('/service/delete-service', { params: { serviceId: subs2[sbi2]._id } }); servicesDeleted++; } catch (e2) { /* skip */ }
             await sleep(50);
           }
         } catch (e2) { /* skip */ }
@@ -377,118 +382,119 @@ async function cleanupExistingData() {
         await sleep(50);
       }
     } catch (e2) {
-      log('⚠️', `    Service cleanup failed: ${e2.response?.data?.message || e2.message}`);
+      log('[WARN]', '    Service cleanup failed: ' + ((e2.response && e2.response.data && e2.response.data.message) || e2.message));
     }
   }
-  log('✅', `    Deleted ${servicesDeleted} services`);
+  log('[OK]', '    Deleted ' + servicesDeleted + ' services');
 
   // --- Delete all products then categories ---
-  log('🧹', '  Deleting products and categories...');
-  let productsDeleted = 0;
-  let categoriesDeleted = 0;
+  log('[CLEANUP]', '  Deleting products and categories...');
+  var productsDeleted = 0;
+  var categoriesDeleted = 0;
   // Delete products first
   try {
-    let page = 1;
-    let hasMore = true;
-    while (hasMore) {
-      const res = await api.get('/product/get-product-by-salon', { params: { pageNumber: page, pageSize: 50, filterValue: '' } });
-      const products = res.data?.data?.result || [];
-      if (products.length === 0) { hasMore = false; break; }
-      for (const prod of products) {
-        try { await api.delete('/product/delete-product', { params: { productId: prod._id } }); productsDeleted++; } catch (e) { /* skip */ }
+    var prodPage = 1;
+    var prodMore = true;
+    while (prodMore) {
+      var prodRes = await api.get('/product/get-product-by-salon', { params: { pageNumber: prodPage, pageSize: 50, filterValue: '' } });
+      var products = (prodRes.data && prodRes.data.data && prodRes.data.data.result) || [];
+      if (products.length === 0) { prodMore = false; break; }
+      for (var pi = 0; pi < products.length; pi++) {
+        try { await api.delete('/product/delete-product', { params: { productId: products[pi]._id } }); productsDeleted++; } catch (e) { /* skip */ }
         await sleep(50);
       }
-      page++;
-      if (page > 10) break;
+      prodPage++;
+      if (prodPage > 10) break;
     }
   } catch (e) {
-    log('⚠️', `    Product fetch failed: ${e.response?.data?.message || e.message}`);
+    log('[WARN]', '    Product fetch failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
   // Then delete categories
   try {
-    const res = await api.get('/product/get-category', { params: { pageNumber: 1, pageSize: 100, filterValue: '' } });
-    const categories = res.data?.data?.result || res.data?.data || [];
+    var catRes = await api.get('/product/get-category', { params: { pageNumber: 1, pageSize: 100, filterValue: '' } });
+    var categories = (catRes.data && catRes.data.data && catRes.data.data.result) || (catRes.data && catRes.data.data) || [];
     if (Array.isArray(categories)) {
-      for (const cat of categories) {
-        try { await api.delete('/product/delete-category', { params: { categoryId: cat._id } }); categoriesDeleted++; } catch (e) { /* skip */ }
+      for (var ci = 0; ci < categories.length; ci++) {
+        try { await api.delete('/product/delete-category', { params: { categoryId: categories[ci]._id } }); categoriesDeleted++; } catch (e) { /* skip */ }
         await sleep(50);
       }
     }
   } catch (e) {
-    log('⚠️', `    Category fetch failed: ${e.response?.data?.message || e.message}`);
+    log('[WARN]', '    Category fetch failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
-  log('✅', `    Deleted ${productsDeleted} products, ${categoriesDeleted} categories`);
+  log('[OK]', '    Deleted ' + productsDeleted + ' products, ' + categoriesDeleted + ' categories');
 
   // --- Delete client users (role=user only, NOT stylists or salon owner) ---
-  log('🧹', '  Deleting client accounts...');
-  let clientsDeleted = 0;
+  log('[CLEANUP]', '  Deleting client accounts...');
+  var clientsDeleted = 0;
   try {
-    let page = 1;
-    let hasMore = true;
-    while (hasMore) {
-      const res = await api.get('/users/get-user', { params: { pageNumber: page, pageSize: 50, filterValue: '' } });
-      const users = res.data?.data?.result || [];
-      if (users.length === 0) { hasMore = false; break; }
-      for (const u of users) {
+    var userPage = 1;
+    var userMore = true;
+    while (userMore) {
+      var userRes = await api.get('/users/get-user', { params: { pageNumber: userPage, pageSize: 50, filterValue: '' } });
+      var users = (userRes.data && userRes.data.data && userRes.data.data.result) || [];
+      if (users.length === 0) { userMore = false; break; }
+      for (var ui = 0; ui < users.length; ui++) {
+        var u = users[ui];
         if (u.role === 'user' && u._id !== salonId) {
           try { await api.delete('/users/delete-user', { params: { userID: u._id } }); clientsDeleted++; } catch (e) { /* skip */ }
           await sleep(50);
         }
       }
-      page++;
-      if (page > 10) break;
+      userPage++;
+      if (userPage > 10) break;
     }
   } catch (e) {
-    log('⚠️', `    User fetch failed: ${e.response?.data?.message || e.message}`);
+    log('[WARN]', '    User fetch failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
-  log('✅', `    Deleted ${clientsDeleted} clients`);
+  log('[OK]', '    Deleted ' + clientsDeleted + ' clients');
 
-  log('🧹', `  Cleanup complete: ${appointmentsDeleted} appointments, ${servicesDeleted} services, ${productsDeleted} products, ${categoriesDeleted} categories, ${clientsDeleted} clients`);
+  log('[CLEANUP]', '  Cleanup complete: ' + appointmentsDeleted + ' appointments, ' + servicesDeleted + ' services, ' + productsDeleted + ' products, ' + categoriesDeleted + ' categories, ' + clientsDeleted + ' clients');
 }
 
-// ─── Step 1: Create/Login Salon Owner ────────────────────────────────────────
+// --- Step 1: Create/Login Salon Owner ---
 
 async function setupSalonOwner() {
-  log('🏪', 'Setting up Salon Owner account...');
+  log('[SALON]', 'Setting up Salon Owner account...');
 
   // Try logging in first
   try {
-    const loginRes = await api.post('/users/login', {
+    var loginRes = await api.post('/users/login', {
       email: SALON_OWNER.email,
       password: SALON_OWNER.password,
     });
     logResponse('login', loginRes);
 
-    const token = extractToken(loginRes.data);
+    var token = extractToken(loginRes.data);
     if (token) {
       setToken(token);
       salonId = extractUserId(loginRes.data);
-      log('✅', `Salon owner logged in. Token set. UserID: ${salonId}`);
+      log('[OK]', 'Salon owner logged in. Token set. UserID: ' + salonId);
 
       // Get full user to extract salonId
       try {
-        const userRes = await api.get('/users/get-user-by-token');
+        var userRes = await api.get('/users/get-user-by-token');
         logResponse('get-user-by-token', userRes);
-        if (userRes.data?.data) {
-          const user = userRes.data.data;
-          salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || user._id;
-          log('✅', `Salon ID: ${salonId}`);
+        if (userRes.data && userRes.data.data) {
+          var user = userRes.data.data;
+          salonId = (typeof user.salon === 'string') ? user.salon : ((user.salon && user.salon._id) || user._id);
+          log('[OK]', 'Salon ID: ' + salonId);
         }
       } catch (ue) {
-        log('⚠️', `get-user-by-token failed: ${ue.response?.data?.message || ue.message}`);
+        log('[WARN]', 'get-user-by-token failed: ' + ((ue.response && ue.response.data && ue.response.data.message) || ue.message));
       }
       return;
     } else {
-      log('⚠️', 'Login response had no token, will try signup...');
+      log('[WARN]', 'Login response had no token, will try signup...');
     }
   } catch (e) {
-    log('ℹ️', `Login failed: ${e.response?.data?.message || e.message}. Trying signup...`);
+    log('[INFO]', 'Login failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message) + '. Trying signup...');
   }
 
   // If login fails, try to create via mobile signup endpoint (public, no auth needed)
   try {
-    log('ℹ️', 'Trying mobile signup endpoint...');
-    const signupRes = await api.post('/users/user-signup-for-mobile', {
+    log('[INFO]', 'Trying mobile signup endpoint...');
+    var signupRes = await api.post('/users/user-signup-for-mobile', {
       name: SALON_OWNER.name,
       email: SALON_OWNER.email,
       phone: SALON_OWNER.phone,
@@ -499,67 +505,65 @@ async function setupSalonOwner() {
     });
     logResponse('mobile-signup', signupRes);
 
-    // Check if signup returned a token
-    let token = extractToken(signupRes.data);
-    if (token) {
-      setToken(token);
+    var token2 = extractToken(signupRes.data);
+    if (token2) {
+      setToken(token2);
       salonId = extractUserId(signupRes.data);
-      log('✅', `Got token from mobile signup. UserID: ${salonId}`);
+      log('[OK]', 'Got token from mobile signup. UserID: ' + salonId);
     } else {
-      // Try logging in after signup
-      log('ℹ️', 'No token in signup response, attempting login...');
+      log('[INFO]', 'No token in signup response, attempting login...');
       await sleep(1500);
-      const loginRes = await api.post('/users/login', {
+      var loginRes2 = await api.post('/users/login', {
         email: SALON_OWNER.email,
         password: SALON_OWNER.password,
       });
-      logResponse('login-after-signup', loginRes);
+      logResponse('login-after-signup', loginRes2);
 
-      token = extractToken(loginRes.data);
-      if (token) {
-        setToken(token);
-        salonId = extractUserId(loginRes.data);
-        log('✅', `Logged in after signup. UserID: ${salonId}`);
+      token2 = extractToken(loginRes2.data);
+      if (token2) {
+        setToken(token2);
+        salonId = extractUserId(loginRes2.data);
+        log('[OK]', 'Logged in after signup. UserID: ' + salonId);
       } else {
-        log('❌', 'Could not get token from login after signup!');
+        log('[FAIL]', 'Could not get token from login after signup!');
       }
     }
 
     // Try to get salon ID from user profile
     if (salonToken) {
       try {
-        const userRes = await api.get('/users/get-user-by-token');
-        logResponse('get-user-by-token', userRes);
-        if (userRes.data?.data) {
-          const user = userRes.data.data;
-          salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || user._id;
-          log('✅', `Salon ID resolved: ${salonId}`);
+        var userRes2 = await api.get('/users/get-user-by-token');
+        logResponse('get-user-by-token', userRes2);
+        if (userRes2.data && userRes2.data.data) {
+          var user2 = userRes2.data.data;
+          salonId = (typeof user2.salon === 'string') ? user2.salon : ((user2.salon && user2.salon._id) || user2._id);
+          log('[OK]', 'Salon ID resolved: ' + salonId);
         }
       } catch (ue) {
-        log('⚠️', `get-user-by-token failed: ${ue.response?.data?.message || ue.message}`);
+        log('[WARN]', 'get-user-by-token failed: ' + ((ue.response && ue.response.data && ue.response.data.message) || ue.message));
       }
 
       // Now create the salon entity
       try {
-        log('ℹ️', 'Creating salon entity...');
-        const salonRes = await api.post('/salon/create-salon', {
+        log('[INFO]', 'Creating salon entity...');
+        var salonRes = await api.post('/salon/create-salon', {
           name: SALON_OWNER.salonName,
           address: SALON_OWNER.address,
           description: SALON_OWNER.description,
           packageName: SALON_OWNER.packageName,
         });
         logResponse('create-salon', salonRes);
-        if (salonRes.data?.data?._id) {
+        if (salonRes.data && salonRes.data.data && salonRes.data.data._id) {
           salonId = salonRes.data.data._id;
-          log('✅', `Salon created: ${salonId}`);
+          log('[OK]', 'Salon created: ' + salonId);
         }
       } catch (se) {
-        log('⚠️', `create-salon: ${se.response?.data?.message || se.message}`);
+        log('[WARN]', 'create-salon: ' + ((se.response && se.response.data && se.response.data.message) || se.message));
       }
     }
   } catch (e) {
-    console.error('❌ Failed to create salon owner:', e.response?.data || e.message);
-    console.error('\n⚠️  You may need to create the salon owner through the admin dashboard first.');
+    console.error('[FAIL] Failed to create salon owner:', (e.response && e.response.data) || e.message);
+    console.error('\n[WARN] You may need to create the salon owner through the admin dashboard first.');
     console.error('    Email: ' + SALON_OWNER.email);
     console.error('    Password: ' + SALON_OWNER.password);
     console.error('\n    Then re-run this script.\n');
@@ -567,20 +571,21 @@ async function setupSalonOwner() {
   }
 
   if (!salonToken) {
-    console.error('❌ FATAL: No auth token obtained. Cannot continue.');
+    console.error('[FAIL] FATAL: No auth token obtained. Cannot continue.');
     console.error('   Please check the API responses above and ensure the login endpoint returns a token.');
     process.exit(1);
   }
 }
 
-// ─── Step 2: Create Stylists ─────────────────────────────────────────────────
+// --- Step 2: Create Stylists ---
 
 async function createStylists() {
-  log('💇', 'Creating stylists...');
+  log('[STYLISTS]', 'Creating stylists...');
 
-  for (const stylist of STYLISTS) {
+  for (var i = 0; i < STYLISTS.length; i++) {
+    var stylist = STYLISTS[i];
     try {
-      const res = await api.post('/stylist/create-stylist', {
+      var res = await api.post('/stylist/create-stylist', {
         name: stylist.name,
         email: stylist.email,
         password: stylist.password,
@@ -593,51 +598,55 @@ async function createStylists() {
         intervalTime: stylist.intervalTime,
         recurringType: 'week',
       });
-      if (res.data?.status === false) {
-        log('ℹ️', `  Stylist ${stylist.name} already exists`);
+      if (res.data && res.data.status === false) {
+        log('[INFO]', '  Stylist ' + stylist.name + ' already exists');
       } else {
-        log('✅', `  Created stylist: ${stylist.name}`);
+        log('[OK]', '  Created stylist: ' + stylist.name);
       }
     } catch (e) {
-      log('⚠️', `  Stylist ${stylist.name}: ${e.response?.data?.message || e.message}`);
+      log('[WARN]', '  Stylist ' + stylist.name + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
     await sleep(500);
   }
 
   // Always fetch all stylists for the salon to get their IDs
   try {
-    const res = await api.get('/stylist/get-stylist-by-salon');
-    logResponse('get-stylists', res);
-    const data = res.data?.data;
+    var res2 = await api.get('/stylist/get-stylist-by-salon');
+    logResponse('get-stylists', res2);
+    var data = res2.data && res2.data.data;
     if (Array.isArray(data) && data.length > 0) {
-      stylistIds = data.map(s => ({ id: s._id, name: s.name || s.userId?.name || 'Unknown' }));
-    } else if (data?.result && Array.isArray(data.result)) {
-      stylistIds = data.result.map(s => ({ id: s._id, name: s.name || s.userId?.name || 'Unknown' }));
+      stylistIds = data.map(function(s) { return { id: s._id, name: s.name || (s.userId && s.userId.name) || 'Unknown' }; });
+    } else if (data && data.result && Array.isArray(data.result)) {
+      stylistIds = data.result.map(function(s) { return { id: s._id, name: s.name || (s.userId && s.userId.name) || 'Unknown' }; });
     }
-    log('✅', `  Found ${stylistIds.length} stylists: ${stylistIds.map(s => s.name).join(', ')}`);
+    log('[OK]', '  Found ' + stylistIds.length + ' stylists: ' + stylistIds.map(function(s) { return s.name; }).join(', '));
   } catch (e) {
-    log('❌', '  Could not fetch stylists: ' + (e.response?.data?.message || e.message));
+    log('[FAIL]', '  Could not fetch stylists: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
 }
 
-// ─── Step 3: Create Services ─────────────────────────────────────────────────
+// --- Step 3: Create Services ---
 
 async function createServices() {
-  log('✂️', 'Creating service menu...');
+  log('[SERVICES]', 'Creating service menu...');
 
   // 1. Fetch existing main services to avoid duplicates
-  let existingMain = [];
+  var existingMain = [];
   try {
-    const res = await api.get('/service/get-enable-main-service');
-    if (Array.isArray(res.data?.data)) existingMain = res.data.data;
+    var res = await api.get('/service/get-enable-main-service');
+    if (Array.isArray(res.data && res.data.data)) existingMain = res.data.data;
   } catch (e) { /* empty */ }
 
-  const existingTitles = new Set(existingMain.map(s => s.title));
+  var existingTitles = {};
+  for (var i = 0; i < existingMain.length; i++) {
+    existingTitles[existingMain[i].title] = true;
+  }
 
   // 2. Create only missing main service categories
-  for (const category of SERVICE_CATEGORIES) {
-    if (existingTitles.has(category.title)) {
-      log('ℹ️', `  Category already exists: ${category.title}`);
+  for (var ci = 0; ci < SERVICE_CATEGORIES.length; ci++) {
+    var category = SERVICE_CATEGORIES[ci];
+    if (existingTitles[category.title]) {
+      log('[INFO]', '  Category already exists: ' + category.title);
       continue;
     }
     try {
@@ -650,71 +659,75 @@ async function createServices() {
         breakTime: category.breakTime,
         isMainService: true,
       });
-      log('✅', `  Created category: ${category.title}`);
+      log('[OK]', '  Created category: ' + category.title);
     } catch (e) {
-      log('⚠️', `  ${category.title}: ${e.response?.data?.message || e.message}`);
+      log('[WARN]', '  ' + category.title + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
     await sleep(300);
   }
 
   // 3. Re-fetch main services to get IDs (pick ONE per title, most recent)
-  let mainServices = [];
+  var mainServices = [];
   try {
-    const res = await api.get('/service/get-enable-main-service');
-    if (Array.isArray(res.data?.data)) mainServices = res.data.data;
+    var res2 = await api.get('/service/get-enable-main-service');
+    if (Array.isArray(res2.data && res2.data.data)) mainServices = res2.data.data;
   } catch (e) { /* empty */ }
-  log('ℹ️', `  Found ${mainServices.length} main services total`);
+  log('[INFO]', '  Found ' + mainServices.length + ' main services total');
 
   // Deduplicate: keep only the FIRST match per title (for our 4 categories)
-  const mainServiceMap = {}; // title -> { _id, title }
-  for (const svc of mainServices) {
+  var mainServiceMap = {};
+  for (var mi = 0; mi < mainServices.length; mi++) {
+    var svc = mainServices[mi];
     if (!mainServiceMap[svc.title]) {
       mainServiceMap[svc.title] = svc;
     }
   }
 
   // 4. For each of our categories, check if sub-services exist; create if not
-  for (const category of SERVICE_CATEGORIES) {
-    const mainSvc = mainServiceMap[category.title];
+  for (var ci2 = 0; ci2 < SERVICE_CATEGORIES.length; ci2++) {
+    var cat = SERVICE_CATEGORIES[ci2];
+    var mainSvc = mainServiceMap[cat.title];
     if (!mainSvc) {
-      log('⚠️', `  No main service found for "${category.title}"`);
+      log('[WARN]', '  No main service found for "' + cat.title + '"');
       continue;
     }
-    const mainId = mainSvc._id;
+    var mainId = mainSvc._id;
 
     // Check if this main service already has sub-services
-    let existingSubs = [];
+    var existingSubs = [];
     try {
-      const res = await api.get('/service/get-enable-sub-service', { params: { mainServiceId: mainId } });
-      if (Array.isArray(res.data?.data)) existingSubs = res.data.data;
+      var subRes = await api.get('/service/get-enable-sub-service', { params: { mainServiceId: mainId } });
+      if (Array.isArray(subRes.data && subRes.data.data)) existingSubs = subRes.data.data;
     } catch (e) { /* empty */ }
 
     if (existingSubs.length > 0) {
-      log('ℹ️', `  ${category.title} already has ${existingSubs.length} sub-services, skipping creation`);
-      for (const sub of existingSubs) {
+      log('[INFO]', '  ' + cat.title + ' already has ' + existingSubs.length + ' sub-services, skipping creation');
+      for (var ei = 0; ei < existingSubs.length; ei++) {
+        var sub = existingSubs[ei];
         subServiceFlatList.push({
-          id: sub._id, mainId, title: sub.title, charges: sub.charges, requiredTime: sub.requiredTime,
+          id: sub._id, mainId: mainId, title: sub.title, charges: sub.charges, requiredTime: sub.requiredTime,
         });
       }
       continue;
     }
 
-    log('ℹ️', `  Creating sub-services for ${category.title} (${mainId})...`);
-    for (const sub of category.subServices) {
+    log('[INFO]', '  Creating sub-services for ' + cat.title + ' (' + mainId + ')...');
+    for (var si = 0; si < cat.subServices.length; si++) {
+      var subDef = cat.subServices[si];
       try {
         await api.post('/service/add-service', {
-          title: sub.title,
-          description: sub.description,
-          charges: sub.charges,
-          requiredTime: sub.requiredTime,
-          leadTime: sub.leadTime,
-          breakTime: sub.breakTime,
+          title: subDef.title,
+          description: subDef.description,
+          charges: subDef.charges,
+          requiredTime: subDef.requiredTime,
+          leadTime: subDef.leadTime,
+          breakTime: subDef.breakTime,
           isMainService: false,
           service: mainId,
         });
-        log('✅', `    - ${sub.title} ($${sub.charges}, ${sub.requiredTime}min)`);
+        log('[OK]', '    - ' + subDef.title + ' ($' + subDef.charges + ', ' + subDef.requiredTime + 'min)');
       } catch (e) {
-        log('⚠️', `    - ${sub.title}: ${e.response?.data?.message || e.message}`);
+        log('[WARN]', '    - ' + subDef.title + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
       }
       await sleep(200);
     }
@@ -722,52 +735,55 @@ async function createServices() {
 
   // 5. Fetch all sub-services for our 4 categories to build subServiceFlatList
   if (subServiceFlatList.length === 0) {
-    for (const category of SERVICE_CATEGORIES) {
-      const mainSvc = mainServiceMap[category.title];
-      if (!mainSvc) continue;
+    for (var ci3 = 0; ci3 < SERVICE_CATEGORIES.length; ci3++) {
+      var cat2 = SERVICE_CATEGORIES[ci3];
+      var mainSvc2 = mainServiceMap[cat2.title];
+      if (!mainSvc2) continue;
       try {
-        const res = await api.get('/service/get-enable-sub-service', { params: { mainServiceId: mainSvc._id } });
-        const subs = res.data?.data || [];
-        for (const sub of subs) {
+        var subRes2 = await api.get('/service/get-enable-sub-service', { params: { mainServiceId: mainSvc2._id } });
+        var subs = (subRes2.data && subRes2.data.data) || [];
+        for (var ssi = 0; ssi < subs.length; ssi++) {
           subServiceFlatList.push({
-            id: sub._id, mainId: mainSvc._id, title: sub.title, charges: sub.charges, requiredTime: sub.requiredTime,
+            id: subs[ssi]._id, mainId: mainSvc2._id, title: subs[ssi].title, charges: subs[ssi].charges, requiredTime: subs[ssi].requiredTime,
           });
         }
       } catch (e) { /* skip */ }
     }
   }
 
-  log('✅', `  Total sub-services available: ${subServiceFlatList.length}`);
+  log('[OK]', '  Total sub-services available: ' + subServiceFlatList.length);
 }
 
-// ─── Step 4: Create Products ─────────────────────────────────────────────────
+// --- Step 4: Create Products ---
 
 async function createProducts() {
-  log('🛍️', 'Creating product catalog...');
+  log('[PRODUCTS]', 'Creating product catalog...');
 
   // Fetch existing categories to avoid duplicates
-  let existingCats = [];
+  var existingCats = [];
   try {
-    const res = await api.get('/product/get-enabled-category');
-    if (Array.isArray(res.data?.data)) existingCats = res.data.data;
+    var res = await api.get('/product/get-enabled-category');
+    if (Array.isArray(res.data && res.data.data)) existingCats = res.data.data;
   } catch (e) { /* empty */ }
 
-  const existingCatNames = new Set(existingCats.map(c => c.categoryName));
-  for (const cat of existingCats) {
-    categoryMap[cat.categoryName] = cat._id;
+  var existingCatNames = {};
+  for (var i = 0; i < existingCats.length; i++) {
+    existingCatNames[existingCats[i].categoryName] = true;
+    categoryMap[existingCats[i].categoryName] = existingCats[i]._id;
   }
 
   // Create only missing categories
-  for (const cat of PRODUCT_CATEGORIES) {
-    if (existingCatNames.has(cat.categoryName)) {
-      log('ℹ️', `  Category already exists: ${cat.categoryName}`);
+  for (var ci = 0; ci < PRODUCT_CATEGORIES.length; ci++) {
+    var cat = PRODUCT_CATEGORIES[ci];
+    if (existingCatNames[cat.categoryName]) {
+      log('[INFO]', '  Category already exists: ' + cat.categoryName);
       continue;
     }
     try {
       await api.post('/product/create-category', { categoryName: cat.categoryName });
-      log('✅', `  Created category: ${cat.categoryName}`);
+      log('[OK]', '  Created category: ' + cat.categoryName);
     } catch (e) {
-      log('⚠️', `  Category ${cat.categoryName}: ${e.response?.data?.message || e.message}`);
+      log('[WARN]', '  Category ' + cat.categoryName + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
     await sleep(200);
   }
@@ -775,34 +791,35 @@ async function createProducts() {
   // Re-fetch to fill in any missing IDs
   if (Object.keys(categoryMap).length < PRODUCT_CATEGORIES.length) {
     try {
-      const res = await api.get('/product/get-enabled-category');
-      const cats = res.data?.data;
+      var res2 = await api.get('/product/get-enabled-category');
+      var cats = res2.data && res2.data.data;
       if (Array.isArray(cats)) {
-        for (const cat of cats) {
-          if (cat._id && cat.categoryName) categoryMap[cat.categoryName] = cat._id;
+        for (var j = 0; j < cats.length; j++) {
+          if (cats[j]._id && cats[j].categoryName) categoryMap[cats[j].categoryName] = cats[j]._id;
         }
       }
     } catch (e) { /* empty */ }
   }
-  log('✅', `  Category map: ${Object.keys(categoryMap).join(', ')}`);
+  log('[OK]', '  Category map: ' + Object.keys(categoryMap).join(', '));
 
   // Check existing products to avoid duplicates
-  let existingProducts = new Set();
+  var existingProducts = {};
   try {
-    const res = await api.get('/product/get-product-by-salon', { params: { pageNumber: 1, pageSize: 100, filterValue: '' } });
-    const prods = res.data?.data?.result || [];
-    for (const p of prods) existingProducts.add(p.productName);
+    var res3 = await api.get('/product/get-product-by-salon', { params: { pageNumber: 1, pageSize: 100, filterValue: '' } });
+    var prods = (res3.data && res3.data.data && res3.data.data.result) || [];
+    for (var k = 0; k < prods.length; k++) existingProducts[prods[k].productName] = true;
   } catch (e) { /* empty */ }
 
   // Create only missing products
-  for (const product of PRODUCTS) {
-    const catId = categoryMap[product.category];
+  for (var pi = 0; pi < PRODUCTS.length; pi++) {
+    var product = PRODUCTS[pi];
+    var catId = categoryMap[product.category];
     if (!catId) {
-      log('⚠️', `  Skipping ${product.productName} (no category ID for "${product.category}")`);
+      log('[WARN]', '  Skipping ' + product.productName + ' (no category ID for "' + product.category + '")');
       continue;
     }
-    if (existingProducts.has(product.productName)) {
-      log('ℹ️', `  Product already exists: ${product.productName}`);
+    if (existingProducts[product.productName]) {
+      log('[INFO]', '  Product already exists: ' + product.productName);
       continue;
     }
     try {
@@ -816,36 +833,37 @@ async function createProducts() {
         category: catId,
         enable: true,
       });
-      log('✅', `  ${product.productName} - $${product.productPrice}`);
+      log('[OK]', '  ' + product.productName + ' - $' + product.productPrice);
     } catch (e) {
-      log('⚠️', `  ${product.productName}: ${e.response?.data?.message || e.message}`);
+      log('[WARN]', '  ' + product.productName + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
     await sleep(200);
   }
 }
 
-// ─── Step 5: Create Clients ──────────────────────────────────────────────────
+// --- Step 5: Create Clients ---
 
 async function createClients() {
-  log('👥', 'Creating client accounts...');
+  log('[CLIENTS]', 'Creating client accounts...');
 
   // Check existing clients
-  let existingEmails = new Set();
+  var existingEmails = {};
   try {
-    const res = await api.get('/users/get-user', { params: { pageNumber: 1, pageSize: 50, filterValue: '' } });
-    const result = res.data?.data?.result || [];
-    for (const u of result) {
-      if (u.role === 'user') existingEmails.add(u.email);
+    var res = await api.get('/users/get-user', { params: { pageNumber: 1, pageSize: 50, filterValue: '' } });
+    var result = (res.data && res.data.data && res.data.data.result) || [];
+    for (var i = 0; i < result.length; i++) {
+      if (result[i].role === 'user') existingEmails[result[i].email] = true;
     }
   } catch (e) { /* empty */ }
 
-  for (const client of CLIENTS) {
-    if (existingEmails.has(client.email)) {
-      log('ℹ️', `  Already exists: ${client.name} (${client.email})`);
+  for (var ci = 0; ci < CLIENTS.length; ci++) {
+    var client = CLIENTS[ci];
+    if (existingEmails[client.email]) {
+      log('[INFO]', '  Already exists: ' + client.name + ' (' + client.email + ')');
       continue;
     }
     try {
-      const res = await api.post('/users/user-signup', {
+      var res2 = await api.post('/users/user-signup', {
         name: client.name,
         email: client.email,
         phone: client.phone,
@@ -856,40 +874,40 @@ async function createClients() {
         active: true,
         password: 'BookB2026!',
       });
-      if (res.data?.status === false) {
-        log('ℹ️', `  ${client.name}: ${res.data?.message}`);
+      if (res2.data && res2.data.status === false) {
+        log('[INFO]', '  ' + client.name + ': ' + (res2.data && res2.data.message));
       } else {
-        log('✅', `  ${client.name} (${client.email})`);
+        log('[OK]', '  ' + client.name + ' (' + client.email + ')');
       }
     } catch (e) {
-      log('⚠️', `  ${client.name}: ${e.response?.data?.message || e.message}`);
+      log('[WARN]', '  ' + client.name + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
     await sleep(200);
   }
 
   // Fetch users to get their IDs
   try {
-    const res = await api.get('/users/get-user', { params: { pageNumber: 1, pageSize: 50, filterValue: '' } });
-    const result = res.data?.data?.result || res.data?.data;
-    if (Array.isArray(result)) {
-      clientUserIds = result
-        .filter(u => u.role === 'user')
-        .map(u => ({ id: u._id, name: u.name, email: u.email, phone: u.phone, gender: u.gender }));
-      log('✅', `  Found ${clientUserIds.length} clients`);
+    var res3 = await api.get('/users/get-user', { params: { pageNumber: 1, pageSize: 50, filterValue: '' } });
+    var result2 = (res3.data && res3.data.data && res3.data.data.result) || (res3.data && res3.data.data);
+    if (Array.isArray(result2)) {
+      clientUserIds = result2
+        .filter(function(u) { return u.role === 'user'; })
+        .map(function(u) { return { id: u._id, name: u.name, email: u.email, phone: u.phone, gender: u.gender }; });
+      log('[OK]', '  Found ' + clientUserIds.length + ' clients');
     } else {
-      log('⚠️', '  Unexpected response format for get-user');
+      log('[WARN]', '  Unexpected response format for get-user');
     }
   } catch (e) {
-    log('⚠️', '  Could not fetch client list: ' + (e.response?.data?.message || e.message));
+    log('[WARN]', '  Could not fetch client list: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
 }
 
-// ─── Step 6: Set Up Availability ─────────────────────────────────────────────
+// --- Step 6: Set Up Availability ---
 
 async function setupAvailability() {
-  log('📅', 'Setting up availability for next 2 weeks...');
+  log('[AVAILABILITY]', 'Setting up availability for next 2 weeks...');
 
-  const businessHours = {
+  var businessHours = {
     slots: [
       { day: 'Monday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
       { day: 'Tuesday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
@@ -897,25 +915,26 @@ async function setupAvailability() {
       { day: 'Thursday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
       { day: 'Friday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
       { day: 'Saturday', slot: [{ startTime: '09:00', endTime: '17:00' }] },
-      { day: 'Sunday', slot: [] }, // Closed
+      { day: 'Sunday', slot: [] },
     ],
     recurringType: 'week',
   };
 
-  for (const stylist of stylistIds) {
+  for (var i = 0; i < stylistIds.length; i++) {
+    var stylist = stylistIds[i];
     try {
       await api.post('/appointment-availability/create-availability-bulk', businessHours, {
         params: { offset: OFFSET, stylistId: stylist.id },
       });
-      log('✅', `  Availability set for ${stylist.name}`);
+      log('[OK]', '  Availability set for ' + stylist.name);
     } catch (e) {
-      log('⚠️', `  ${stylist.name}: ${e.response?.data?.message || e.message}`);
+      log('[WARN]', '  ' + stylist.name + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
 
     // Also create day-by-day availability for the next 14 days
-    const today = new Date();
-    for (let d = 0; d < 14; d++) {
-      const date = new Date(today);
+    var today = new Date();
+    for (var d = 0; d < 14; d++) {
+      var date = new Date(today);
       date.setDate(today.getDate() + d);
       if (date.getDay() === 0) continue; // Skip Sundays
 
@@ -933,74 +952,75 @@ async function setupAvailability() {
   }
 }
 
-// ─── Step 7: Create Appointments ─────────────────────────────────────────────
+// --- Step 7: Create Appointments ---
 
 async function createAppointments() {
-  log('📋', 'Creating appointments for the next 2 weeks...');
+  log('[APPOINTMENTS]', 'Creating appointments for the next 2 weeks...');
 
   if (subServiceFlatList.length === 0) {
-    log('⚠️', '  No services found. Trying to fetch existing services...');
+    log('[WARN]', '  No services found. Trying to fetch existing services...');
     try {
-      const res = await api.get('/service/get-service-groupby-category');
-      const groups = res.data?.data?.result || res.data?.data;
+      var res = await api.get('/service/get-service-groupby-category');
+      var groups = (res.data && res.data.data && res.data.data.result) || (res.data && res.data.data);
       if (Array.isArray(groups)) {
-        for (const group of groups) {
-          const mainId = group.category?._id || group.mainService?._id || group._id;
-          const subs = group.subService || group.subServices || [];
+        for (var gi = 0; gi < groups.length; gi++) {
+          var group = groups[gi];
+          var mainId = (group.category && group.category._id) || (group.mainService && group.mainService._id) || group._id;
+          var subs = group.subService || group.subServices || [];
           if (mainId && Array.isArray(subs)) {
-            for (const sub of subs) {
+            for (var si = 0; si < subs.length; si++) {
               subServiceFlatList.push({
-                id: sub._id,
-                mainId,
-                title: sub.title,
-                charges: sub.charges,
-                requiredTime: sub.requiredTime,
+                id: subs[si]._id,
+                mainId: mainId,
+                title: subs[si].title,
+                charges: subs[si].charges,
+                requiredTime: subs[si].requiredTime,
               });
             }
           }
         }
-        log('✅', `  Found ${subServiceFlatList.length} services`);
+        log('[OK]', '  Found ' + subServiceFlatList.length + ' services');
       }
     } catch (e) {
-      log('❌', '  Cannot create appointments without services');
+      log('[FAIL]', '  Cannot create appointments without services');
       return;
     }
   }
 
   if (stylistIds.length === 0 || subServiceFlatList.length === 0 || clientUserIds.length === 0) {
-    log('⚠️', '  Missing stylists, services, or clients. Skipping appointments.');
+    log('[WARN]', '  Missing stylists, services, or clients. Skipping appointments.');
     return;
   }
 
-  const today = new Date();
-  let created = 0;
-  let failed = 0;
+  var today = new Date();
+  var created = 0;
+  var failed = 0;
 
   // Create 3-5 appointments per day for the next 14 days
-  for (let d = 0; d < 14; d++) {
-    const date = new Date(today);
+  for (var d = 0; d < 14; d++) {
+    var date = new Date(today);
     date.setDate(today.getDate() + d);
     if (date.getDay() === 0) continue; // Skip Sundays
 
-    const appointmentsPerDay = 3 + Math.floor(Math.random() * 3); // 3-5
-    const usedSlots = new Set();
+    var appointmentsPerDay = 3 + Math.floor(Math.random() * 3); // 3-5
+    var usedSlots = {};
 
-    for (let a = 0; a < appointmentsPerDay; a++) {
-      const stylist = randomPick(stylistIds);
-      const service = randomPick(subServiceFlatList);
-      const client = randomPick(clientUserIds);
+    for (var a = 0; a < appointmentsPerDay; a++) {
+      var stylist = randomPick(stylistIds);
+      var service = randomPick(subServiceFlatList);
+      var client = randomPick(clientUserIds);
 
       // Pick a unique time slot
-      let time;
-      let attempts = 0;
+      var time;
+      var attempts = 0;
       do {
         time = randomPick(TIME_SLOTS);
         attempts++;
-      } while (usedSlots.has(`${stylist.id}-${time}`) && attempts < 20);
-      usedSlots.add(`${stylist.id}-${time}`);
+      } while (usedSlots[stylist.id + '-' + time] && attempts < 20);
+      usedSlots[stylist.id + '-' + time] = true;
 
-      // Determine status: past = completed, today = mix, future = requested/confirmed
-      let status;
+      // Determine status
+      var status;
       if (d < 0) {
         status = Math.random() > 0.1 ? 'completed' : 'canceled';
       } else if (d === 0) {
@@ -1010,17 +1030,16 @@ async function createAppointments() {
       }
 
       try {
-        const appointmentDate = formatDate(date);
+        var appointmentDate = formatDate(date);
         // Convert time string to 24h for API
-        const timeParts = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
-        let hour = parseInt(timeParts[1]);
+        var timeParts = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        var hour = parseInt(timeParts[1]);
         if (timeParts[3].toUpperCase() === 'PM' && hour !== 12) hour += 12;
         if (timeParts[3].toUpperCase() === 'AM' && hour === 12) hour = 0;
-        const time24 = `${hour.toString().padStart(2, '0')}:${timeParts[2]}`;
+        var time24 = String(hour).padStart(2, '0') + ':' + timeParts[2];
 
         // Match the mobile app salon flow: timeAsADate = current ISO timestamp
-        // (not a constructed UTC time, which confuses the API's date processing)
-        const res = await api.post('/appointment/add-appointment-from-dashboard', {
+        var aptRes = await api.post('/appointment/add-appointment-from-dashboard', {
           appointmentDate: appointmentDate,
           timeData: {
             timeAsADate: new Date().toISOString(),
@@ -1042,99 +1061,98 @@ async function createAppointments() {
         });
 
         // Check actual API response status
-        if (res.data?.status === false) {
-          log('⚠️', `  ${getDateString(date)} ${time}: API returned false - ${res.data?.message}`);
+        if (aptRes.data && aptRes.data.status === false) {
+          log('[WARN]', '  ' + getDateString(date) + ' ' + time + ': API returned false - ' + (aptRes.data && aptRes.data.message));
           failed++;
         } else {
           created++;
           if (created <= 3) {
-            // Log first few responses for debugging
-            logResponse(`appointment:${getDateString(date)}`, res);
+            logResponse('appointment:' + getDateString(date), aptRes);
           }
-          log('✅', `  ${getDateString(date)} ${time} - ${client.name} → ${service.title} with ${stylist.name}`);
+          log('[OK]', '  ' + getDateString(date) + ' ' + time + ' - ' + client.name + ' -> ' + service.title + ' with ' + stylist.name);
         }
       } catch (e) {
         failed++;
-        log('⚠️', `  ${getDateString(date)} ${time}: ${e.response?.data?.message || e.message}`);
+        log('[WARN]', '  ' + getDateString(date) + ' ' + time + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
       }
       await sleep(300);
     }
   }
 
-  log('📋', `Created ${created} appointments total (${failed} failed)`);
+  log('[APPOINTMENTS]', 'Created ' + created + ' appointments total (' + failed + ' failed)');
 }
 
-// ─── Step 8: Verify Appointments ──────────────────────────────────────────────
+// --- Step 8: Verify Appointments ---
 
 async function verifyAppointments() {
-  log('🔍', 'Verifying appointments are queryable...');
+  log('[VERIFY]', 'Verifying appointments are queryable...');
 
-  const today = new Date();
-  const fromDate = formatDate(today);
-  const toDate = new Date(today);
+  var today = new Date();
+  var fromDate = formatDate(today);
+  var toDate = new Date(today);
   toDate.setDate(today.getDate() + 14);
-  const toDateStr = formatDate(toDate);
+  var toDateStr = formatDate(toDate);
 
-  // Query 1: get-appointment-from-dashboard (what the web dashboard uses)
+  // Query 1: get-appointment-from-dashboard
   try {
-    const res = await api.post('/appointment/get-appointment-from-dashboard', {
+    var res = await api.post('/appointment/get-appointment-from-dashboard', {
       salon: salonId,
       fromDate: fromDate,
       toDate: toDateStr,
       offset: OFFSET,
     });
-    const appointments = res.data?.data;
+    var appointments = res.data && res.data.data;
     if (Array.isArray(appointments)) {
-      log('✅', `  Dashboard query: ${appointments.length} appointments found (${fromDate} to ${toDateStr})`);
+      log('[OK]', '  Dashboard query: ' + appointments.length + ' appointments found (' + fromDate + ' to ' + toDateStr + ')');
       if (appointments.length > 0) {
-        const apt = appointments[0];
-        log('ℹ️', `  Sample: ${apt.dateAsAString} ${apt.timeAsAString} | status=${apt.status} | offset=${apt.offset}`);
+        var apt = appointments[0];
+        log('[INFO]', '  Sample: ' + apt.dateAsAString + ' ' + apt.timeAsAString + ' | status=' + apt.status + ' | offset=' + apt.offset);
       }
     } else {
-      log('⚠️', `  Dashboard query returned non-array: ${JSON.stringify(res.data).substring(0, 300)}`);
+      log('[WARN]', '  Dashboard query returned non-array: ' + JSON.stringify(res.data).substring(0, 300));
     }
   } catch (e) {
-    log('⚠️', `  Dashboard query failed: ${e.response?.data?.message || e.message}`);
+    log('[WARN]', '  Dashboard query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
 
-  // Query 2: get-appointment-by-stylist (alternate query path)
+  // Query 2: get-appointment-by-stylist
   if (stylistIds.length > 0) {
     try {
-      const res = await api.get('/appointment/get-appointment-by-stylist', {
+      var res2 = await api.get('/appointment/get-appointment-by-stylist', {
         params: { pageNumber: 1, pageSize: 10, stylistId: stylistIds[0].id },
       });
-      const data = res.data?.data;
-      const count = data?.result?.length || 0;
-      const total = data?.totalPageSize || 0;
-      log('✅', `  Stylist query (${stylistIds[0].name}): ${count} appointments (${total} total pages)`);
+      var data = res2.data && res2.data.data;
+      var count = (data && data.result && data.result.length) || 0;
+      var total = (data && data.totalPageSize) || 0;
+      log('[OK]', '  Stylist query (' + stylistIds[0].name + '): ' + count + ' appointments (' + total + ' total pages)');
     } catch (e) {
-      log('⚠️', `  Stylist query failed: ${e.response?.data?.message || e.message}`);
+      log('[WARN]', '  Stylist query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
   }
 
   // Query 3: KPI endpoints
   try {
-    const convRes = await api.get('/appointment/appointment-conversion-rate', { params: { salon: salonId } });
-    log('ℹ️', `  Conversion rate: ${JSON.stringify(convRes.data?.data)}`);
+    var convRes = await api.get('/appointment/appointment-conversion-rate', { params: { salon: salonId } });
+    log('[INFO]', '  Conversion rate: ' + JSON.stringify(convRes.data && convRes.data.data));
   } catch (e) {
-    log('⚠️', `  Conversion rate: ${e.response?.data?.message || e.message}`);
+    log('[WARN]', '  Conversion rate: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
 
   // Query 4: getAppointmentsByMonth
   try {
-    const monthRes = await api.get(`/salon/getAppointmentsByMonth/${salonId}`);
-    log('ℹ️', `  Appointments by month: ${JSON.stringify(monthRes.data?.data).substring(0, 200)}`);
+    var monthRes = await api.get('/salon/getAppointmentsByMonth/' + salonId);
+    log('[INFO]', '  Appointments by month: ' + JSON.stringify(monthRes.data && monthRes.data.data).substring(0, 200));
   } catch (e) {
-    log('⚠️', `  Appointments by month: ${e.response?.data?.message || e.message}`);
+    log('[WARN]', '  Appointments by month: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// --- Main ---
 
 async function main() {
-  console.log('\n╔══════════════════════════════════════════════════════╗');
-  console.log('║        BookB Test Data Seed Script                  ║');
-  console.log('╚══════════════════════════════════════════════════════╝\n');
+  console.log('\n========================================================');
+  console.log('        BookB Test Data Seed Script');
+  console.log('========================================================\n');
 
   try {
     await setupSalonOwner();
@@ -1147,39 +1165,45 @@ async function main() {
     await createAppointments();
     await verifyAppointments();
 
-    console.log('\n╔══════════════════════════════════════════════════════╗');
-    console.log('║        LOGIN CREDENTIALS                            ║');
-    console.log('╠══════════════════════════════════════════════════════╣');
-    console.log('║                                                     ║');
-    console.log('║  SALON OWNER (Dashboard):                           ║');
-    console.log(`║  Email:    ${SALON_OWNER.email.padEnd(39)}║`);
-    console.log(`║  Password: ${SALON_OWNER.password.padEnd(39)}║`);
-    console.log('║                                                     ║');
-    console.log('║  STYLISTS (Mobile App):                             ║');
-    for (const s of STYLISTS) {
-      console.log(`║  ${s.name.padEnd(20)} ${s.email.padEnd(28)}║`);
+    console.log('\n========================================================');
+    console.log('        LOGIN CREDENTIALS');
+    console.log('========================================================');
+    console.log('');
+    console.log('  SALON OWNER (Dashboard):');
+    console.log('  Email:    ' + SALON_OWNER.email);
+    console.log('  Password: ' + SALON_OWNER.password);
+    console.log('');
+    console.log('  STYLISTS (Mobile App):');
+    for (var i = 0; i < STYLISTS.length; i++) {
+      console.log('  ' + STYLISTS[i].name + '  ' + STYLISTS[i].email);
     }
-    console.log(`║  Password: ${STYLISTS[0].password.padEnd(39)}║`);
-    console.log('║                                                     ║');
-    console.log('║  CLIENTS (Mobile App):                              ║');
-    for (const c of CLIENTS.slice(0, 4)) {
-      console.log(`║  ${c.name.padEnd(20)} ${c.email.padEnd(28)}║`);
+    console.log('  Password: ' + STYLISTS[0].password);
+    console.log('');
+    console.log('  CLIENTS (Mobile App):');
+    for (var j = 0; j < Math.min(4, CLIENTS.length); j++) {
+      console.log('  ' + CLIENTS[j].name + '  ' + CLIENTS[j].email);
     }
-    console.log(`║  Password: BookB2026!                                ║`);
-    console.log('║  ... and 4 more clients                             ║');
-    console.log('║                                                     ║');
-    console.log('╚══════════════════════════════════════════════════════╝\n');
+    console.log('  Password: BookB2026!');
+    console.log('  ... and ' + (CLIENTS.length - 4) + ' more clients');
+    console.log('');
+    console.log('========================================================\n');
+
+    var totalSubs = 0;
+    for (var k = 0; k < SERVICE_CATEGORIES.length; k++) {
+      totalSubs += SERVICE_CATEGORIES[k].subServices.length;
+    }
 
     console.log('Data created:');
-    console.log(`  - 1 Salon: ${SALON_OWNER.salonName} (Owner: ${SALON_OWNER.name})`);
-    console.log(`  - ${STYLISTS.length} Stylists`);
-    console.log(`  - ${SERVICE_CATEGORIES.length} Service categories, ${SERVICE_CATEGORIES.reduce((sum, c) => sum + c.subServices.length, 0)} services`);
-    console.log(`  - ${PRODUCT_CATEGORIES.length} Product categories, ${PRODUCTS.length} products`);
-    console.log(`  - ${CLIENTS.length} Client accounts`);
-    console.log(`  - ~50+ Appointments across the next 2 weeks\n`);
+    console.log('  - 1 Salon: ' + SALON_OWNER.salonName + ' (Owner: ' + SALON_OWNER.name + ')');
+    console.log('  - ' + STYLISTS.length + ' Stylists');
+    console.log('  - ' + SERVICE_CATEGORIES.length + ' Service categories, ' + totalSubs + ' services');
+    console.log('  - ' + PRODUCT_CATEGORIES.length + ' Product categories, ' + PRODUCTS.length + ' products');
+    console.log('  - ' + CLIENTS.length + ' Client accounts');
+    console.log('  - ~50+ Appointments across the next 2 weeks\n');
 
   } catch (e) {
-    console.error('\n❌ Fatal error:', e.message);
+    console.error('\n[FAIL] Fatal error: ' + e.message);
+    if (e.stack) console.error(e.stack);
     process.exit(1);
   }
 }
