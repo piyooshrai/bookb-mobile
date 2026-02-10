@@ -23,13 +23,14 @@ export default function BookingConfirmation() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.successContainer}>
-          <View style={styles.successCircle}>
+          <View style={styles.pendingCircle}>
             <Svg width={48} height={48} viewBox="0 0 24 24" fill="none">
-              <Path d="M20 6L9 17l-5-5" stroke={colors.textWhite} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+              <Circle cx={12} cy={12} r={10} stroke={colors.textWhite} strokeWidth={2} />
+              <Path d="M12 6v6l4 2" stroke={colors.textWhite} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
           </View>
-          <Text style={styles.successTitle}>Booking Confirmed!</Text>
-          <Text style={styles.successSubtitle}>Your appointment has been requested</Text>
+          <Text style={styles.successTitle}>Booking Requested</Text>
+          <Text style={styles.successSubtitle}>Waiting for stylist confirmation</Text>
 
           <View style={styles.successCard}>
             <View style={styles.successRow}>
@@ -53,7 +54,12 @@ export default function BookingConfirmation() {
             </View>
           </View>
 
-          <Text style={styles.successNote}>You'll receive a notification once the salon confirms your appointment.</Text>
+          <View style={styles.pendingBadge}>
+            <View style={styles.pendingDot} />
+            <Text style={styles.pendingBadgeText}>Pending Confirmation</Text>
+          </View>
+
+          <Text style={styles.successNote}>You'll receive a notification once the stylist confirms your appointment.</Text>
 
           <TouchableOpacity style={styles.doneButton} onPress={() => router.replace('/(customer)/')} activeOpacity={0.7}>
             <Text style={styles.doneButtonText}>BACK TO HOME</Text>
@@ -167,7 +173,7 @@ export default function BookingConfirmation() {
 
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm} activeOpacity={0.7}>
-          <Text style={styles.confirmText}>CONFIRM BOOKING</Text>
+          <Text style={styles.confirmText}>REQUEST BOOKING</Text>
           <Text style={styles.confirmPrice}>${params.servicePrice || '65'}</Text>
         </TouchableOpacity>
       </View>
@@ -207,7 +213,10 @@ const styles = StyleSheet.create({
   confirmPrice: { fontFamily: fontFamilies.heading, fontSize: 16, color: colors.white },
   // Success screen
   successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  successCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  pendingCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  pendingBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(196,151,61,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 20 },
+  pendingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.gold },
+  pendingBadgeText: { fontFamily: fontFamilies.bodySemiBold, fontSize: 13, color: colors.gold },
   successTitle: { fontFamily: fontFamilies.heading, fontSize: 26, color: colors.textPrimary, marginBottom: 8 },
   successSubtitle: { fontFamily: fontFamilies.body, fontSize: 14, color: colors.textSecondary, marginBottom: 28 },
   successCard: { backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 20, width: '100%', marginBottom: 20 },

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -109,8 +109,9 @@ export default function CartScreen() {
 
       {cart.length > 0 && (
         <View style={styles.bottomBar}>
-          <TouchableOpacity style={styles.checkoutButton} activeOpacity={0.7} onPress={() => router.push({ pathname: '/(customer)/shop/checkout', params: { total: subtotal.toFixed(2), items: String(itemCount) } })}>
-            <Text style={styles.checkoutText}>CHECKOUT</Text>
+          <Text style={styles.posNote}>Show this list to salon staff at checkout</Text>
+          <TouchableOpacity style={styles.checkoutButton} activeOpacity={0.7} onPress={() => Alert.alert('Cart Ready', `Show this cart (${itemCount} items, $${subtotal.toFixed(2)}) to salon staff for payment at the counter.`, [{ text: 'OK' }])}>
+            <Text style={styles.checkoutText}>READY FOR CHECKOUT</Text>
             <Text style={styles.checkoutPrice}>${subtotal.toFixed(2)}</Text>
           </TouchableOpacity>
         </View>
@@ -151,7 +152,8 @@ const styles = StyleSheet.create({
   emptySubtitle: { fontFamily: fontFamilies.body, fontSize: 14, color: colors.textSecondary },
   shopBtn: { backgroundColor: colors.navy, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 28, marginTop: 12 },
   shopBtnText: { fontFamily: fontFamilies.bodySemiBold, fontSize: 13, color: colors.white, letterSpacing: 2 },
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 34 },
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 34 },
+  posNote: { fontFamily: fontFamilies.body, fontSize: 12, color: colors.textTertiary, textAlign: 'center', marginBottom: 10 },
   checkoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.gold, borderRadius: 12, paddingVertical: 16 },
   checkoutText: { fontFamily: fontFamilies.bodySemiBold, fontSize: 14, color: colors.white, letterSpacing: 2 },
   checkoutPrice: { fontFamily: fontFamilies.heading, fontSize: 16, color: colors.white },
