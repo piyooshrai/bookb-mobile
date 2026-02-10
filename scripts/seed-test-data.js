@@ -1172,8 +1172,18 @@ async function createAppointments() {
           failed++;
         } else {
           created++;
+          var newAptId = aptRes.data && aptRes.data.data && aptRes.data.data.appointmentId;
           if (created <= 3) {
             logResponse('appointment:' + getDateString(date), aptRes);
+          }
+          // After first successful appointment, fetch its detail to see stored data
+          if (created === 1 && newAptId) {
+            try {
+              var detailRes = await api.get('/appointment/get-appointment-detail', { params: { appointmentId: newAptId } });
+              log('[DIAGNOSTIC]', '  Stored appointment detail: ' + JSON.stringify(detailRes.data).substring(0, 800));
+            } catch (de) {
+              log('[WARN]', '  Could not fetch appointment detail: ' + ((de.response && de.response.data && de.response.data.message) || de.message));
+            }
           }
           log('[OK]', '  ' + getDateString(date) + ' ' + time + ' - ' + client.name + ' -> ' + service.title + ' with ' + stylist.name);
         }
@@ -1240,6 +1250,29 @@ async function verifyAppointments() {
     } catch (e) {
       log('[WARN]', '  Stylist query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
+
+    // Try alternate stylist endpoints
+    try {
+      var recentRes = await api.get('/stylist/getRecentAppointment/' + stylistIds[0].id + '/requested');
+      log('[INFO]', '  Stylist recent (requested): ' + JSON.stringify(recentRes.data).substring(0, 400));
+    } catch (e) {
+      log('[WARN]', '  Stylist recent failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+  }
+
+  // Query 2b: Try dashboard query with YYYY-MM-DD format too
+  try {
+    var todayISO = formatDate(today);
+    var toDateISO = formatDate(toDate);
+    var res2b = await api.post('/appointment/get-appointment-from-dashboard', {
+      salon: salonId,
+      fromDate: todayISO,
+      toDate: toDateISO,
+      offset: OFFSET,
+    });
+    log('[INFO]', '  Dashboard (YYYY-MM-DD): ' + JSON.stringify(res2b.data).substring(0, 300));
+  } catch (e) {
+    log('[WARN]', '  Dashboard (YYYY-MM-DD) failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
   }
 
   // Query 3: KPI endpoints
