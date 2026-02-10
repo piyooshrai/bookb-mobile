@@ -1,5 +1,6 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
@@ -50,12 +51,24 @@ const METHOD_CONFIG: Record<PaymentMethod, { bg: string; text: string; label: st
 // ---------------------------------------------------------------------------
 
 export default function PointOfSaleScreen() {
+  const router = useRouter();
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Point of Sale</Text>
-        <Text style={styles.subtitle}>Today's transactions {'\u00B7'} {MOCK_TRANSACTIONS.length} payments</Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.title}>Point of Sale</Text>
+            <Text style={styles.subtitle}>Today's transactions {'\u00B7'} {MOCK_TRANSACTIONS.length} payments</Text>
+          </View>
+          <TouchableOpacity style={styles.newOrderButton} activeOpacity={0.7} onPress={() => router.push('/(salon)/pos/create')}>
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+              <Path d="M12 5v14M5 12h14" stroke={colors.navy} strokeWidth={2} strokeLinecap="round" />
+            </Svg>
+            <Text style={styles.newOrderText}>New Order</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
@@ -187,10 +200,30 @@ const styles = StyleSheet.create({
     color: colors.textWhite,
     marginBottom: 4,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   subtitle: {
     fontFamily: fontFamilies.body,
     fontSize: 13,
     color: '#a39e96',
+  },
+  newOrderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.gold,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 2,
+  },
+  newOrderText: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: 12,
+    color: colors.navy,
   },
   // Body
   body: { flex: 1 },

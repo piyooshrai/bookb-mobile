@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect, Polyline } from 'react-native-svg';
@@ -278,7 +278,7 @@ export default function ProductDetail() {
 
       {/* Sticky bottom: Add to Cart */}
       <View style={styles.stickyBottom}>
-        <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8} onPress={() => { Alert.alert('Added to Cart', `${quantity}x ${PRODUCT.name} added to your cart`, [{ text: 'Continue Shopping', onPress: () => router.back() }, { text: 'View Cart', onPress: () => router.push('/(customer)/shop/cart') }]); }}>
           <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
             <Rect
               x={4}

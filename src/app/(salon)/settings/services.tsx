@@ -88,7 +88,7 @@ export default function ServicesScreen() {
             </View>
             <Text style={styles.subtitle}>Manage your service offerings</Text>
           </View>
-          <TouchableOpacity style={styles.addButton} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.addButton} activeOpacity={0.7} onPress={() => router.push('/(salon)/settings/add-service')}>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
               <Path d="M12 5v14M5 12h14" stroke={colors.navy} strokeWidth={2} strokeLinecap="round" />
             </Svg>

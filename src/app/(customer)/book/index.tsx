@@ -188,6 +188,20 @@ export default function BookAppointment() {
           ]}
           activeOpacity={0.7}
           disabled={!selectedService}
+          onPress={() => {
+            const service = MOCK_SERVICES.find((s) => s.id === selectedService);
+            if (service) {
+              router.push({
+                pathname: '/(customer)/book/stylist',
+                params: {
+                  serviceId: service.id,
+                  serviceName: service.name,
+                  servicePrice: String(service.price),
+                  serviceDuration: service.duration,
+                },
+              });
+            }
+          }}
         >
           <Text
             style={[

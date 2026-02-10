@@ -120,7 +120,7 @@ export default function CustomerHomeScreen() {
           <Text style={styles.upcomingService}>{MOCK_UPCOMING.service} with {MOCK_UPCOMING.stylist}</Text>
           <View style={styles.upcomingFooter}>
             <Text style={styles.upcomingPrice}>${MOCK_UPCOMING.price}</Text>
-            <TouchableOpacity style={styles.manageButton} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.manageButton} activeOpacity={0.7} onPress={() => router.push('/(customer)/appointment/appt-001')}>
               <Text style={styles.manageText}>Manage</Text>
             </TouchableOpacity>
           </View>
