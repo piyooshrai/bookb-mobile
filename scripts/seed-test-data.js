@@ -278,11 +278,14 @@ async function cleanupExistingData() {
     toDate.setDate(today.getDate() + 30);
     var res = await api.post('/appointment/get-appointment-from-dashboard', {
       salon: salonId,
-      fromDate: formatDate(fromDate),
-      toDate: formatDate(toDate),
+      fromDate: formatDateMMDDYYYY(fromDate),
+      toDate: formatDateMMDDYYYY(toDate),
       offset: OFFSET,
     });
     var appointments = res.data && res.data.data;
+    if (!Array.isArray(appointments)) {
+      appointments = (res.data && res.data.result) || [];
+    }
     if (Array.isArray(appointments) && appointments.length > 0) {
       log('[INFO]', '    Found ' + appointments.length + ' appointments to delete');
       for (var i = 0; i < appointments.length; i++) {
@@ -1098,8 +1101,8 @@ async function createAppointments() {
   var created = 0;
   var failed = 0;
 
-  // Create 3-5 appointments per day for the next 14 days
-  for (var d = 0; d < 14; d++) {
+  // Create 3-5 appointments per day for the next 14 days (start from tomorrow)
+  for (var d = 1; d < 14; d++) {
     var date = new Date(today);
     date.setDate(today.getDate() + d);
     if (date.getDay() === 0) continue; // Skip Sundays
@@ -1191,12 +1194,12 @@ async function verifyAppointments() {
   log('[VERIFY]', 'Verifying appointments are queryable...');
 
   var today = new Date();
-  var fromDate = formatDate(today);
+  var fromDate = formatDateMMDDYYYY(today);
   var toDate = new Date(today);
   toDate.setDate(today.getDate() + 14);
-  var toDateStr = formatDate(toDate);
+  var toDateStr = formatDateMMDDYYYY(toDate);
 
-  // Query 1: get-appointment-from-dashboard
+  // Query 1: get-appointment-from-dashboard (use MM/DD/YYYY dates)
   try {
     var res = await api.post('/appointment/get-appointment-from-dashboard', {
       salon: salonId,
@@ -1209,10 +1212,16 @@ async function verifyAppointments() {
       log('[OK]', '  Dashboard query: ' + appointments.length + ' appointments found (' + fromDate + ' to ' + toDateStr + ')');
       if (appointments.length > 0) {
         var apt = appointments[0];
-        log('[INFO]', '  Sample: ' + apt.dateAsAString + ' ' + apt.timeAsAString + ' | status=' + apt.status + ' | offset=' + apt.offset);
+        log('[INFO]', '  Sample: ' + JSON.stringify(apt).substring(0, 300));
       }
     } else {
-      log('[WARN]', '  Dashboard query returned non-array: ' + JSON.stringify(res.data).substring(0, 300));
+      // Try checking the result field instead
+      var result = res.data && res.data.result;
+      if (Array.isArray(result)) {
+        log('[OK]', '  Dashboard query (result field): ' + result.length + ' appointments');
+      } else {
+        log('[WARN]', '  Dashboard query returned: ' + JSON.stringify(res.data).substring(0, 300));
+      }
     }
   } catch (e) {
     log('[WARN]', '  Dashboard query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
