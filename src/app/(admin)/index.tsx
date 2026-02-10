@@ -47,16 +47,17 @@ export default function AdminDashboard() {
   const { data: subscriptionData, isLoading: subLoading } = useAdminSubscription();
 
   // Map API data to platform stats (fallback to mock when demo or no data)
-  const platformStats = !isDemo && dashboardData
+  const db = dashboardData as any;
+  const platformStats = !isDemo && db
     ? {
-        totalSalons: dashboardData.totalSalons ?? MOCK_PLATFORM_STATS.totalSalons,
-        activeSalons: dashboardData.activeSalons ?? MOCK_PLATFORM_STATS.activeSalons,
-        totalUsers: dashboardData.totalUsers ?? MOCK_PLATFORM_STATS.totalUsers,
-        totalStylists: dashboardData.totalStylists ?? MOCK_PLATFORM_STATS.totalStylists,
-        monthlyRevenue: dashboardData.monthlyRevenue ?? MOCK_PLATFORM_STATS.monthlyRevenue,
-        activeSubscriptions: dashboardData.activeSubscriptions ?? MOCK_PLATFORM_STATS.activeSubscriptions,
-        newSignupsThisWeek: dashboardData.newSignupsThisWeek ?? MOCK_PLATFORM_STATS.newSignupsThisWeek,
-        appointmentsToday: dashboardData.appointmentsToday ?? MOCK_PLATFORM_STATS.appointmentsToday,
+        totalSalons: db.totalSalons ?? MOCK_PLATFORM_STATS.totalSalons,
+        activeSalons: db.activeSalons ?? MOCK_PLATFORM_STATS.activeSalons,
+        totalUsers: db.totalUsers ?? MOCK_PLATFORM_STATS.totalUsers,
+        totalStylists: db.totalStylists ?? MOCK_PLATFORM_STATS.totalStylists,
+        monthlyRevenue: db.monthlyRevenue ?? MOCK_PLATFORM_STATS.monthlyRevenue,
+        activeSubscriptions: db.activeSubscriptions ?? MOCK_PLATFORM_STATS.activeSubscriptions,
+        newSignupsThisWeek: db.newSignupsThisWeek ?? MOCK_PLATFORM_STATS.newSignupsThisWeek,
+        appointmentsToday: db.appointmentsToday ?? MOCK_PLATFORM_STATS.appointmentsToday,
       }
     : MOCK_PLATFORM_STATS;
 

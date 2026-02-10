@@ -144,7 +144,7 @@ export default function ShopScreen() {
               <ActivityIndicator size="small" color={colors.navy} />
             </View>
           )}
-          {filteredProducts.map((product) => {
+          {filteredProducts.map((product: any) => {
             const catColor = CATEGORY_COLORS[product.category] || colors.navy;
             return (
               <TouchableOpacity

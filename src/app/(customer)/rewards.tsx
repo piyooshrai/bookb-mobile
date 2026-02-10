@@ -306,7 +306,7 @@ export default function RewardsScreen() {
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Transaction History</Text>
           </View>
-          {transactions.map((tx, index) => (
+          {transactions.map((tx: any, index: number) => (
             <View
               key={tx.id}
               style={[styles.txRow, index > 0 && styles.rowBorder]}

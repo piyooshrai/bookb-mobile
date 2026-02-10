@@ -78,15 +78,16 @@ export default function SalonDashboardScreen() {
   // --- Map API data to display values ---
   const stats = useMemo(() => {
     if (isDemo || !generalCount) return MOCK_STATS;
+    const gc = generalCount as any;
     return {
-      todayRevenue: generalCount.todayRevenue ?? MOCK_STATS.todayRevenue,
-      weekRevenue: generalCount.weekRevenue ?? MOCK_STATS.weekRevenue,
-      todayAppointments: generalCount.todayAppointments ?? MOCK_STATS.todayAppointments,
-      completedToday: generalCount.completedToday ?? MOCK_STATS.completedToday,
-      cancelledToday: generalCount.cancelledToday ?? MOCK_STATS.cancelledToday,
-      activeStylists: generalCount.activeStylists ?? MOCK_STATS.activeStylists,
-      totalClients: generalCount.totalClients ?? MOCK_STATS.totalClients,
-      newClientsThisWeek: generalCount.newClientsThisWeek ?? MOCK_STATS.newClientsThisWeek,
+      todayRevenue: gc.todayRevenue ?? MOCK_STATS.todayRevenue,
+      weekRevenue: gc.weekRevenue ?? MOCK_STATS.weekRevenue,
+      todayAppointments: gc.todayAppointments ?? MOCK_STATS.todayAppointments,
+      completedToday: gc.completedToday ?? MOCK_STATS.completedToday,
+      cancelledToday: gc.cancelledToday ?? MOCK_STATS.cancelledToday,
+      activeStylists: gc.activeStylists ?? MOCK_STATS.activeStylists,
+      totalClients: gc.totalClients ?? MOCK_STATS.totalClients,
+      newClientsThisWeek: gc.newClientsThisWeek ?? MOCK_STATS.newClientsThisWeek,
     };
   }, [isDemo, generalCount]);
 
@@ -213,7 +214,7 @@ export default function SalonDashboardScreen() {
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
           </View>
-          {upcomingAppointments.map((apt) => (
+          {upcomingAppointments.map((apt: any) => (
             <View key={apt.id} style={styles.appointmentRow}>
               <View style={styles.appointmentTime}>
                 <Text style={styles.aptTimeText}>{apt.time}</Text>
@@ -242,7 +243,7 @@ export default function SalonDashboardScreen() {
               <Text style={styles.cardTitle}>Staff Activity</Text>
             </View>
           </View>
-          {staffList.map((stylist) => (
+          {staffList.map((stylist: any) => (
             <View key={stylist.id} style={styles.stylistRow}>
               <View style={styles.stylistAvatar}>
                 <Text style={styles.stylistInitial}>{stylist.name[0]}</Text>

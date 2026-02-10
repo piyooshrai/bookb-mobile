@@ -60,8 +60,8 @@ export default function OrderHistoryScreen() {
             <ActivityIndicator size="small" color={colors.navy} />
           </View>
         )}
-        {orders.map((order) => {
-          const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.Completed;
+        {orders.map((order: any) => {
+          const statusCfg = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.Completed;
           return (
             <View key={order.id} style={styles.orderCard}>
               <View style={styles.orderTop}>

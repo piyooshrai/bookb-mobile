@@ -55,17 +55,18 @@ export default function SelectTime() {
 
   const selectedDateForApi = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
   const { data: availabilityData, isLoading: isSlotsLoading } = useMobileAvailability(selectedDateForApi, !isDemo);
+  const availData = availabilityData as any;
 
   const { displayTimeSlots, displayBookedSlots } = useMemo(() => {
-    if (!isDemo && availabilityData?.timeData) {
-      const allSlots = availabilityData.timeData.map((t: { timeAsAString: string }) => t.timeAsAString);
-      const booked = availabilityData.timeData
+    if (!isDemo && availData?.timeData) {
+      const allSlots = availData.timeData.map((t: { timeAsAString: string }) => t.timeAsAString);
+      const booked = availData.timeData
         .filter((t: { isAvailable: boolean }) => !t.isAvailable)
         .map((t: { timeAsAString: string }) => t.timeAsAString);
       return { displayTimeSlots: allSlots, displayBookedSlots: booked };
     }
     return { displayTimeSlots: TIME_SLOTS, displayBookedSlots: BOOKED_SLOTS };
-  }, [isDemo, availabilityData]);
+  }, [isDemo, availData]);
 
   const days = useMemo(() => generateDays(currentYear, currentMonth), [currentYear, currentMonth]);
   const isToday = (day: number) => day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
@@ -169,7 +170,7 @@ export default function SelectTime() {
           </View>
         )}
         <View style={styles.slotsGrid}>
-          {displayTimeSlots.map((slot) => {
+          {displayTimeSlots.map((slot: string) => {
             const booked = displayBookedSlots.includes(slot);
             const selected = selectedTime === slot;
             return (

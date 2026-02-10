@@ -24,29 +24,30 @@ export default function AdminConfigScreen() {
   const { data: usersData, isLoading: usersLoading } = useUsers({ pageNumber: 1, pageSize: 1 });
 
   // Map API data to user management rows (fallback to mock when demo or no data)
-  const userManagementRows = !isDemo && dashboardData
+  const db = dashboardData as any;
+  const userManagementRows = !isDemo && db
     ? [
         {
           label: 'Total Users',
-          value: dashboardData.totalUsers != null
-            ? Number(dashboardData.totalUsers).toLocaleString()
+          value: db.totalUsers != null
+            ? Number(db.totalUsers).toLocaleString()
             : MOCK_USER_MANAGEMENT_ROWS[0].value,
           badge: null as number | null,
         },
         {
           label: 'Active Salons',
-          value: dashboardData.activeSalons != null
-            ? String(dashboardData.activeSalons)
+          value: db.activeSalons != null
+            ? String(db.activeSalons)
             : MOCK_USER_MANAGEMENT_ROWS[1].value,
           badge: null as number | null,
         },
         {
           label: 'Pending Approvals',
-          value: dashboardData.pendingApprovals != null
-            ? String(dashboardData.pendingApprovals)
+          value: db.pendingApprovals != null
+            ? String(db.pendingApprovals)
             : MOCK_USER_MANAGEMENT_ROWS[2].value,
-          badge: dashboardData.pendingApprovals != null
-            ? (dashboardData.pendingApprovals > 0 ? Number(dashboardData.pendingApprovals) : null)
+          badge: db.pendingApprovals != null
+            ? (db.pendingApprovals > 0 ? Number(db.pendingApprovals) : null)
             : MOCK_USER_MANAGEMENT_ROWS[2].badge,
         },
       ]

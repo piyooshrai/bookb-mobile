@@ -283,7 +283,7 @@ export default function NewAppointmentScreen() {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stylistScroll}>
-            {displayStylists.map((stylist) => (
+            {displayStylists.map((stylist: any) => (
               <TouchableOpacity
                 key={stylist.id}
                 style={[styles.stylistCard, selectedStylist === stylist.id && styles.stylistCardActive]}

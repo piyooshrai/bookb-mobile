@@ -84,7 +84,7 @@ export default function MyDayScreen() {
       }
     : null;
 
-  const nextApt = nextAptFromApi || timeline.find((a) => a.status === 'in-progress') || timeline.find((a) => a.status === 'upcoming');
+  const nextApt = nextAptFromApi || timeline.find((a: any) => a.status === 'in-progress') || timeline.find((a: any) => a.status === 'upcoming');
 
   const isLoading = !isDemo && (loadingDay || loadingLatest || loadingGeneral);
 
@@ -142,7 +142,7 @@ export default function MyDayScreen() {
               <Text style={styles.cardTitle}>Today's Timeline</Text>
             </View>
           </View>
-          {timeline.map((apt, i) => (
+          {timeline.map((apt: any, i: number) => (
             <View key={apt.id} style={styles.tlRow}>
               <View style={styles.tlLeft}>
                 <View style={[styles.tlDot, apt.status === 'completed' && styles.dotDone, apt.status === 'in-progress' && styles.dotNow, apt.status === 'upcoming' && styles.dotNext]} />

@@ -260,7 +260,7 @@ export default function CustomerHomeScreen() {
           <View style={styles.recentHeader}>
             <Text style={styles.cardTitle}>Recent Visits</Text>
           </View>
-          {recentVisits.map((visit, index) => (
+          {recentVisits.map((visit: any, index: number) => (
             <View
               key={visit.id}
               style={[
