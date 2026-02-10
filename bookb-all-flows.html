@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BookB — All Flows</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--n9:#05080e;--n8:#0a101b;--n7:#0f1829;--n6:#141f36;--n5:#1a2744;--n4:#243456;--n3:#2e4168;--g5:#c4973d;--g4:#d4ae6b;--g3:#e7d1a2;--g2:#f0e2c4;--g1:#f9f3e6;--w50:#fafaf9;--w100:#f5f4f2;--w200:#e8e6e3;--w300:#d4d1cc;--w400:#a39e96;--w500:#736d64;--w600:#5c564e;--ok:#2d7d46;--err:#c0392b}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08080c;color:#fff;font-family:'DM Sans',sans-serif;min-height:100vh}
+.hdr{text-align:center;padding:60px 20px 20px}
+.hdr h1{font-family:'Playfair Display',serif;font-size:42px;font-weight:400}.hdr h1 b{color:var(--g5);font-weight:600}
+.hdr p{color:var(--w500);font-size:14px;font-weight:300;letter-spacing:3px;text-transform:uppercase}
+.slbl{text-align:center;padding:56px 20px 30px}
+.slbl h2{font-family:'Playfair Display',serif;font-size:24px;font-weight:400;color:var(--w300);margin-bottom:6px}
+.slbl p{color:var(--w600);font-size:11px;letter-spacing:3px;text-transform:uppercase;font-weight:500}
+.slbl .roletag{display:inline-block;padding:4px 14px;border-radius:6px;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+.roletag.r-cust{background:rgba(45,125,70,.12);color:var(--ok)}
+.roletag.r-styl{background:rgba(196,151,61,.12);color:var(--g5)}
+.roletag.r-admin{background:rgba(192,57,43,.12);color:var(--err)}
+.row{display:flex;justify-content:center;gap:40px;padding:0 20px 20px;flex-wrap:wrap}
+.pw{display:flex;flex-direction:column;align-items:center;gap:16px}
+.pl{color:var(--w500);font-size:11px;letter-spacing:3px;text-transform:uppercase;font-weight:500}
+.ph{width:375px;height:812px;border-radius:50px;background:#000;padding:18px;position:relative;box-shadow:0 0 0 1px rgba(196,151,61,.1),0 40px 80px rgba(0,0,0,.6)}
+.ph::before{content:'';position:absolute;top:12px;left:50%;transform:translateX(-50%);width:120px;height:32px;background:#000;border-radius:20px;z-index:10}
+.sc{width:100%;height:100%;border-radius:36px;overflow:hidden;position:relative;display:flex;flex-direction:column}
+
+/* SHARED */
+.bn{background:#fff;border-top:1px solid var(--w200);padding:10px 8px 30px;display:flex;justify-content:space-around}
+.ni{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:48px}
+.niw{width:22px;height:22px}
+.niw svg{width:22px;height:22px;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:var(--w400)}
+.ni.on .niw svg{stroke:var(--n5);stroke-width:2}
+.nt{font-size:9px;font-weight:500;color:var(--w400);letter-spacing:.3px}
+.ni.on .nt{color:var(--n5);font-weight:600}
+.ni.on::after{content:'';width:4px;height:4px;border-radius:50%;background:var(--g5);margin-top:-1px}
+
+/* ================================ */
+/* CUSTOMER SCREENS                 */
+/* ================================ */
+.s-cust-home{background:var(--w50)}
+.ch-head{background:var(--n5);padding:54px 24px 28px;border-radius:0 0 28px 28px;position:relative;overflow:hidden}
+.ch-head::before{content:'';position:absolute;top:-40%;right:-20%;width:300px;height:300px;background:radial-gradient(circle,rgba(196,151,61,.06),transparent 70%)}
+.ch-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
+.ch-hi{color:var(--w400);font-size:12px;margin-bottom:3px}
+.ch-name{font-family:'Playfair Display',serif;color:#fff;font-size:22px;font-weight:500}
+.ch-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--g5),var(--g4));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:14px}
+.ch-salon-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.04);border-radius:16px;padding:16px;display:flex;gap:14px;align-items:center}
+.ch-salon-logo{width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;color:var(--g4);font-size:18px;font-weight:600}
+.ch-salon-name{font-size:16px;font-weight:600;color:#fff;margin-bottom:2px}
+.ch-salon-addr{font-size:12px;color:var(--w400)}
+.ch-body{flex:1;padding:24px 20px 0;overflow-y:auto}
+.ch-sect{font-size:11px;font-weight:600;color:var(--w500);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;margin-top:4px}
+.ch-next{background:#fff;border:1px solid rgba(196,151,61,.2);border-radius:14px;padding:16px;margin-bottom:18px;background:linear-gradient(135deg,#fff,var(--g1))}
+.ch-next-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.ch-next-svc{font-size:16px;font-weight:600;color:var(--n5)}
+.ch-next-date{font-size:12px;color:var(--g5);font-weight:600}
+.ch-next-meta{font-size:13px;color:var(--w500)}
+.ch-next-with{font-size:12px;color:var(--w400);margin-top:4px}
+.ch-actions{display:flex;gap:8px;margin-top:12px}
+.ch-act{flex:1;padding:10px;border-radius:10px;text-align:center;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.ch-act-p{background:var(--n5);color:#fff}
+.ch-act-s{background:rgba(26,39,68,.06);color:var(--n5)}
+/* Service categories */
+.ch-cats{display:flex;gap:10px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px}
+.ch-cat{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:72px}
+.ch-cat-icon{width:56px;height:56px;border-radius:16px;background:#fff;border:1px solid var(--w200);display:flex;align-items:center;justify-content:center}
+.ch-cat-icon svg{width:22px;height:22px;stroke:var(--n5);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ch-cat-lbl{font-size:10px;font-weight:600;color:var(--n5);letter-spacing:.3px}
+/* Coins card */
+.ch-coins{background:var(--n5);border-radius:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.ch-coins-left span{font-size:11px;color:var(--w400);display:block;margin-bottom:2px}
+.ch-coins-val{font-family:'Playfair Display',serif;font-size:24px;color:var(--g4);font-weight:600}
+.ch-coins-btn{background:var(--g5);border:none;border-radius:8px;padding:8px 16px;color:#fff;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-family:'DM Sans',sans-serif}
+
+/* Customer Booking */
+.s-cust-book{background:var(--w50)}
+.cb-head{background:var(--n5);padding:54px 24px 24px;border-radius:0 0 24px 24px}
+.cb-title{font-family:'Playfair Display',serif;color:#fff;font-size:20px;font-weight:500;margin-bottom:4px}
+.cb-sub{color:var(--w400);font-size:13px}
+.cb-styl-scroll{display:flex;gap:12px;margin-top:18px;overflow-x:auto;padding-bottom:4px}
+.cb-styl{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:68px}
+.cb-styl-av{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:16px;border:2px solid transparent}
+.cb-styl.pk .cb-styl-av{border-color:var(--g5);box-shadow:0 0 0 2px rgba(196,151,61,.2)}
+.cb-styl-nm{font-size:11px;color:var(--w300);font-weight:500}
+.cb-styl.pk .cb-styl-nm{color:var(--g4);font-weight:600}
+.cb-body{flex:1;padding:20px;overflow-y:auto}
+/* Mini calendar */
+.mini-cal{background:#fff;border-radius:14px;border:1px solid var(--w200);padding:16px;margin-bottom:16px}
+.mini-cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.mini-cal-month{font-size:15px;font-weight:600;color:var(--n5)}
+.mini-cal-nav{display:flex;gap:8px}
+.mini-cal-nav div{width:28px;height:28px;border-radius:8px;background:var(--w100);display:flex;align-items:center;justify-content:center}
+.mini-cal-nav svg{width:14px;height:14px;stroke:var(--n5);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal-day-name{font-size:10px;color:var(--w400);font-weight:600;padding:4px 0;letter-spacing:.5px}
+.cal-day{font-size:13px;color:var(--n5);padding:8px 0;border-radius:8px;font-weight:500}
+.cal-day.today{background:var(--n5);color:#fff;font-weight:700}
+.cal-day.sel{background:var(--g5);color:#fff;font-weight:700}
+.cal-day.off{color:var(--w300)}
+.cal-day.has-dot{position:relative}
+.cal-day.has-dot::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--g5)}
+/* Time slots inline */
+.cb-slots{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.cb-slot{padding:10px 16px;border-radius:8px;border:1.5px solid var(--w200);background:#fff;font-size:13px;font-weight:600;color:var(--n5)}
+.cb-slot.ch{border-color:var(--g5);background:var(--g1);color:var(--g5)}
+.cb-slot.off{opacity:.25}
+.cb-svc-pick{background:#fff;border-radius:14px;border:1px solid var(--w200);padding:14px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.cb-svc-info h4{font-size:14px;font-weight:600;color:var(--n5);margin-bottom:2px}
+.cb-svc-info span{font-size:12px;color:var(--w400)}
+.cb-svc-price{font-family:'Playfair Display',serif;font-size:16px;font-weight:600;color:var(--g5)}
+.cb-footer{padding:14px 20px 34px;background:#fff;border-top:1px solid var(--w200)}
+.cb-cta{width:100%;background:linear-gradient(135deg,var(--g5),#b8892f);border:none;border-radius:14px;padding:18px;color:#fff;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;font-family:'DM Sans',sans-serif;box-shadow:0 8px 28px rgba(196,151,61,.2)}
+
+/* Customer rewards */
+.s-cust-rewards{background:var(--w50)}
+.rw-head{background:var(--n5);padding:54px 24px 28px;border-radius:0 0 28px 28px;text-align:center;position:relative;overflow:hidden}
+.rw-head::before{content:'';position:absolute;top:-30%;left:50%;transform:translateX(-50%);width:300px;height:300px;background:radial-gradient(circle,rgba(196,151,61,.06),transparent 70%)}
+.rw-title{font-family:'Playfair Display',serif;color:#fff;font-size:20px;font-weight:500;margin-bottom:16px;position:relative;z-index:1}
+.rw-coin-ring{width:100px;height:100px;border-radius:50%;border:3px solid rgba(196,151,61,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;position:relative;z-index:1}
+.rw-coin-val{font-family:'Playfair Display',serif;font-size:36px;font-weight:600;color:var(--g4)}
+.rw-coin-lbl{font-size:11px;color:var(--w400);letter-spacing:1px;text-transform:uppercase;position:relative;z-index:1}
+.rw-body{flex:1;padding:20px;overflow-y:auto}
+.rw-how{font-size:11px;font-weight:600;color:var(--w500);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px}
+.rw-card{background:#fff;border-radius:12px;border:1px solid var(--w200);padding:14px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.rw-card-left h4{font-size:14px;font-weight:600;color:var(--n5);margin-bottom:2px}
+.rw-card-left span{font-size:12px;color:var(--w400)}
+.rw-card-coins{font-family:'Playfair Display',serif;font-size:18px;font-weight:600;color:var(--g5)}
+.rw-hist-item{background:#fff;border-radius:12px;border:1px solid var(--w200);padding:14px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.rw-hist-left span{font-size:13px;font-weight:500;color:var(--n5);display:block}
+.rw-hist-left small{font-size:11px;color:var(--w400)}
+.rw-hist-amt{font-size:14px;font-weight:700}
+.rw-hist-plus{color:var(--ok)}
+.rw-hist-minus{color:var(--err)}
+
+/* ================================ */
+/* STYLIST SCREENS                  */
+/* ================================ */
+.s-styl-dash{background:var(--w50)}
+.sd-head{background:var(--n5);padding:54px 24px 24px;border-radius:0 0 24px 24px;position:relative;overflow:hidden}
+.sd-head::before{content:'';position:absolute;top:-50px;right:-30px;width:180px;height:180px;background:radial-gradient(circle,rgba(196,151,61,.05),transparent 70%)}
+.sd-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+.sd-greet h3{color:var(--w400);font-size:12px;margin-bottom:3px}
+.sd-greet h2{font-family:'Playfair Display',serif;color:#fff;font-size:20px;font-weight:500}
+.sd-icons{display:flex;gap:8px}
+.sd-ib{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center}
+.sd-ib svg{width:16px;height:16px;stroke:var(--w300);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sd-status{display:flex;gap:8px;margin-bottom:18px}
+.sd-status-card{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:12px 10px;text-align:center}
+.sd-status-val{font-family:'Playfair Display',serif;font-size:22px;font-weight:600;color:#fff;line-height:1;margin-bottom:2px}
+.sd-status-val.gld{color:var(--g4)}
+.sd-status-lbl{font-size:10px;color:var(--w400)}
+.sd-checkin{background:rgba(45,125,70,.1);border:1px solid rgba(45,125,70,.15);border-radius:12px;padding:14px;display:flex;justify-content:space-between;align-items:center}
+.sd-checkin-left span{font-size:12px;color:var(--ok);font-weight:600;display:block}
+.sd-checkin-left small{font-size:11px;color:var(--w400)}
+.sd-checkin-btn{background:var(--ok);border:none;border-radius:8px;padding:8px 18px;color:#fff;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-family:'DM Sans',sans-serif}
+.sd-body{flex:1;padding:24px 20px 0;overflow-y:auto}
+.sd-sect{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.sd-sect-t{font-size:14px;font-weight:600;color:var(--n5)}
+.sd-sect-l{font-size:12px;color:var(--g5);font-weight:600}
+/* Timeline */
+.sd-tl{position:relative;padding-left:24px;margin-bottom:20px}
+.sd-tl::before{content:'';position:absolute;left:6px;top:8px;bottom:8px;width:1px;background:var(--w200)}
+.sd-tl-item{position:relative;margin-bottom:12px}
+.sd-tl-item::before{content:'';position:absolute;left:-24px;top:8px;width:13px;height:13px;border-radius:50%;border:2px solid var(--w200);background:#fff}
+.sd-tl-item.now::before{border-color:var(--g5);background:var(--g5)}
+.sd-tl-item.done::before{border-color:var(--ok);background:var(--ok)}
+.sd-tl-card{background:#fff;border-radius:12px;border:1px solid var(--w200);padding:14px}
+.sd-tl-item.now .sd-tl-card{border-color:rgba(196,151,61,.2);background:linear-gradient(135deg,#fff,var(--g1))}
+.sd-tl-time{font-size:11px;font-weight:600;color:var(--g5);margin-bottom:4px;letter-spacing:.5px}
+.sd-tl-item.done .sd-tl-time{color:var(--ok)}
+.sd-tl-client{font-size:14px;font-weight:600;color:var(--n5);margin-bottom:2px}
+.sd-tl-svc{font-size:12px;color:var(--w500)}
+.sd-tl-dur{font-size:11px;color:var(--w400);margin-top:4px}
+/* Stylist availability */
+.s-styl-avail{background:var(--w50)}
+.sa-head{background:var(--n5);padding:54px 24px 22px;border-radius:0 0 24px 24px}
+.sa-title{font-family:'Playfair Display',serif;color:#fff;font-size:20px;font-weight:500;margin-bottom:4px}
+.sa-sub{color:var(--w400);font-size:13px}
+.sa-body{flex:1;padding:20px;overflow-y:auto}
+.sa-day{background:#fff;border-radius:12px;border:1px solid var(--w200);padding:14px 16px;margin-bottom:8px}
+.sa-day-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sa-day-name{font-size:14px;font-weight:600;color:var(--n5)}
+.sa-day-toggle{width:40px;height:22px;border-radius:11px;background:var(--ok);position:relative}
+.sa-day-toggle::after{content:'';position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#fff}
+.sa-day-toggle.off{background:var(--w300)}
+.sa-day-toggle.off::after{right:auto;left:2px}
+.sa-slots{display:flex;gap:6px;flex-wrap:wrap}
+.sa-slot{padding:6px 12px;border-radius:6px;background:var(--w100);font-size:12px;font-weight:500;color:var(--n5)}
+.sa-slot.blocked{background:rgba(192,57,43,.06);color:var(--err);text-decoration:line-through}
+
+/* Stylist client notes */
+.s-styl-notes{background:var(--w50)}
+.sn-head{background:var(--n5);padding:54px 24px 22px;border-radius:0 0 24px 24px}
+.sn-title{font-family:'Playfair Display',serif;color:#fff;font-size:20px;font-weight:500}
+.sn-body{flex:1;padding:20px;overflow-y:auto}
+.sn-client{background:#fff;border-radius:12px;border:1px solid var(--w200);padding:14px 16px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
+.sn-client-av{width:40px;height:40px;border-radius:50%;background:var(--n5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:600;flex-shrink:0}
+.sn-client-info h4{font-size:14px;font-weight:600;color:var(--n5);margin-bottom:2px}
+.sn-client-info p{font-size:12px;color:var(--w500);line-height:1.5}
+.sn-client-date{font-size:10px;color:var(--w400);margin-top:4px}
+
+/* ================================ */
+/* ADMIN SCREENS                    */
+/* ================================ */
+.s-admin-dash{background:var(--w50)}
+.ad-head{background:var(--n5);padding:54px 24px 24px;border-radius:0 0 24px 24px}
+.ad-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+.ad-title{font-family:'Playfair Display',serif;color:#fff;font-size:20px;font-weight:500}
+.ad-badge{padding:4px 10px;border-radius:6px;background:rgba(192,57,43,.15);color:#f87171;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.ad-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.ad-kpi{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:13px 12px}
+.ad-kpi-val{font-family:'Playfair Display',serif;font-size:22px;font-weight:600;color:#fff;line-height:1;margin-bottom:2px}
+.ad-kpi-val.gld{color:var(--g4)}
+.ad-kpi-lbl{font-size:10px;color:var(--w400)}
+.ad-kpi-delta{font-size:10px;font-weight:600;margin-top:3px}
+.ad-up{color:#4ade80}.ad-dn{color:#f87171}
+.ad-body{flex:1;padding:20px;overflow-y:auto}
+.ad-sect{font-size:11px;font-weight:600;color:var(--w500);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;margin-top:4px}
+.ad-salon-card{background:#fff;border-radius:12px;border:1px solid var(--w200);padding:14px 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.ad-salon-left{display:flex;gap:12px;align-items:center}
+.ad-salon-av{width:40px;height:40px;border-radius:10px;background:var(--n5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:600}
+.ad-salon-name{font-size:14px;font-weight:600;color:var(--n5);margin-bottom:2px}
+.ad-salon-plan{font-size:11px;color:var(--w400)}
+.ad-salon-status{padding:4px 8px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.ad-active{background:rgba(45,125,70,.08);color:var(--ok)}
+.ad-trial{background:rgba(196,151,61,.08);color:var(--g5)}
+.ad-expired{background:rgba(192,57,43,.08);color:var(--err)}
+/* Admin subscriptions */
+.s-admin-subs{background:var(--w50)}
+.as-head{background:var(--n5);padding:54px 24px 22px;border-radius:0 0 24px 24px}
+.as-title{font-family:'Playfair Display',serif;color:#fff;font-size:20px;font-weight:500;margin-bottom:4px}
+.as-sub{color:var(--w400);font-size:13px}
+.as-body{flex:1;padding:20px;overflow-y:auto}
+.as-plan{background:#fff;border-radius:14px;border:1px solid var(--w200);padding:18px;margin-bottom:10px;position:relative;overflow:hidden}
+.as-plan.featured::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--g5)}
+.as-plan-name{font-family:'Playfair Display',serif;font-size:18px;font-weight:600;color:var(--n5);margin-bottom:4px}
+.as-plan-price{font-family:'Playfair Display',serif;font-size:28px;font-weight:600;color:var(--g5);margin-bottom:4px}
+.as-plan-price span{font-size:14px;color:var(--w400);font-family:'DM Sans',sans-serif;font-weight:400}
+.as-plan-feat{font-size:12px;color:var(--w500);line-height:1.8}
+.as-plan-count{position:absolute;top:18px;right:18px;font-size:11px;color:var(--w400);font-weight:500}
+/* Admin chart */
+.ad-chart{background:#fff;border-radius:14px;border:1px solid var(--w200);padding:18px;margin-bottom:12px}
+.ad-chart-title{font-size:14px;font-weight:600;color:var(--n5);margin-bottom:14px}
+.ad-bars{display:flex;align-items:flex-end;gap:8px;height:90px}
+.ad-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.ad-bar{width:100%;max-width:24px;border-radius:3px 3px 0 0;min-height:2px}
+.ad-bar-n{background:var(--n5)}.ad-bar-g{background:var(--g5)}
+.ad-bar-l{font-size:9px;color:var(--w400);font-weight:500}
+
+.ft2{text-align:center;padding:60px 20px;color:var(--w600);font-size:11px;letter-spacing:4px;text-transform:uppercase}
+@media(max-width:900px){.row{flex-direction:column;align-items:center}.ph{transform:scale(.88)}}
+@media(max-width:480px){.ph{transform:scale(.72)}.hdr h1{font-size:28px}}
+</style>
+</head>
+<body>
+<div class="hdr"><h1>Book<b>B</b></h1><p>All Flows — One App</p></div>
+
+<!-- ================================ -->
+<!-- CUSTOMER FLOW                    -->
+<!-- ================================ -->
+<div class="slbl"><div class="roletag r-cust">Customer</div><h2>Customer Experience</h2><p>Home · Book · Rewards</p></div>
+<div class="row">
+
+<!-- CUSTOMER HOME -->
+<div class="pw"><div class="ph"><div class="sc s-cust-home">
+<div class="ch-head">
+<div class="ch-row">
+<div><div class="ch-hi">Welcome back</div><div class="ch-name">Sarah Mitchell</div></div>
+<div class="ch-av">SM</div>
+</div>
+<div class="ch-salon-card">
+<div class="ch-salon-logo">LH</div>
+<div><div class="ch-salon-name">Luxe Hair Studio</div><div class="ch-salon-addr">42 King's Road, Chelsea</div></div>
+</div>
+</div>
+<div class="ch-body">
+<div class="ch-sect">Next Appointment</div>
+<div class="ch-next">
+<div class="ch-next-top"><div class="ch-next-svc">Balayage + Toner</div><div class="ch-next-date">11 Feb, 9:30 AM</div></div>
+<div class="ch-next-meta">120 min · Hair Colouring</div>
+<div class="ch-next-with">with James R. — Senior Stylist</div>
+<div class="ch-actions"><div class="ch-act ch-act-s">Reschedule</div><div class="ch-act ch-act-p">Check In</div></div>
+</div>
+<div class="ch-sect">Services</div>
+<div class="ch-cats">
+<div class="ch-cat"><div class="ch-cat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12s1.5 4 4 4 4-4 4-4"/></svg></div><div class="ch-cat-lbl">Colour</div></div>
+<div class="ch-cat"><div class="ch-cat-icon"><svg viewBox="0 0 24 24"><path d="M6 2v6m0 0a6 6 0 0 0 12 0V2"/><line x1="12" y1="14" x2="12" y2="22"/></svg></div><div class="ch-cat-lbl">Cuts</div></div>
+<div class="ch-cat"><div class="ch-cat-icon"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/></svg></div><div class="ch-cat-lbl">Treatments</div></div>
+<div class="ch-cat"><div class="ch-cat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg></div><div class="ch-cat-lbl">Shop</div></div>
+</div>
+<div class="ch-coins"><div class="ch-coins-left"><span>BookB Rewards</span><div class="ch-coins-val">150</div></div><button class="ch-coins-btn">Redeem</button></div>
+</div>
+<div class="bn">
+<div class="ni on"><div class="niw"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="nt">Home</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="nt">Book</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 21v-2a4 4 0 0 1 8 0v2"/><circle cx="12" cy="8" r="7" stroke-dasharray="4 3"/></svg></div><div class="nt">Rewards</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg></div><div class="nt">Shop</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="nt">Profile</div></div>
+</div>
+</div></div><div class="pl">Customer Home</div></div>
+
+<!-- CUSTOMER BOOKING -->
+<div class="pw"><div class="ph"><div class="sc s-cust-book">
+<div class="cb-head">
+<div class="cb-title">Book Appointment</div>
+<div class="cb-sub">Choose your stylist and time</div>
+<div class="cb-styl-scroll">
+<div class="cb-styl pk"><div class="cb-styl-av" style="background:var(--n5)">JR</div><div class="cb-styl-nm">James R.</div></div>
+<div class="cb-styl"><div class="cb-styl-av" style="background:var(--g5)">MA</div><div class="cb-styl-nm">Maria A.</div></div>
+<div class="cb-styl"><div class="cb-styl-av" style="background:#4a6491">SK</div><div class="cb-styl-nm">Sophie K.</div></div>
+<div class="cb-styl"><div class="cb-styl-av" style="background:var(--w500)">TM</div><div class="cb-styl-nm">Tom M.</div></div>
+</div>
+</div>
+<div class="cb-body">
+<div class="mini-cal">
+<div class="mini-cal-head"><div class="mini-cal-month">February 2026</div><div class="mini-cal-nav"><div><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div><div><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div></div></div>
+<div class="cal-days">
+<div class="cal-day-name">M</div><div class="cal-day-name">T</div><div class="cal-day-name">W</div><div class="cal-day-name">T</div><div class="cal-day-name">F</div><div class="cal-day-name">S</div><div class="cal-day-name">S</div>
+<div class="cal-day off"></div><div class="cal-day off"></div><div class="cal-day off"></div><div class="cal-day off"></div><div class="cal-day off"></div><div class="cal-day off"></div><div class="cal-day">1</div>
+<div class="cal-day">2</div><div class="cal-day">3</div><div class="cal-day">4</div><div class="cal-day">5</div><div class="cal-day">6</div><div class="cal-day">7</div><div class="cal-day">8</div>
+<div class="cal-day today">9</div><div class="cal-day has-dot">10</div><div class="cal-day sel">11</div><div class="cal-day has-dot">12</div><div class="cal-day">13</div><div class="cal-day">14</div><div class="cal-day">15</div>
+<div class="cal-day">16</div><div class="cal-day">17</div><div class="cal-day">18</div><div class="cal-day">19</div><div class="cal-day">20</div><div class="cal-day">21</div><div class="cal-day">22</div>
+</div>
+</div>
+<div class="cb-slots">
+<div class="cb-slot">9:00</div><div class="cb-slot ch">9:30</div><div class="cb-slot">10:00</div><div class="cb-slot off">10:30</div><div class="cb-slot">11:00</div><div class="cb-slot off">11:30</div><div class="cb-slot">12:00</div>
+</div>
+<div class="cb-svc-pick"><div class="cb-svc-info"><h4>Balayage</h4><span>120 min · Hair Colouring</span></div><div class="cb-svc-price">£150</div></div>
+</div>
+<div class="cb-footer"><button class="cb-cta">Confirm Booking — £150</button></div>
+</div></div><div class="pl">Customer Booking</div></div>
+
+<!-- CUSTOMER REWARDS -->
+<div class="pw"><div class="ph"><div class="sc s-cust-rewards">
+<div class="rw-head">
+<div class="rw-title">Your Rewards</div>
+<div class="rw-coin-ring"><div class="rw-coin-val">150</div></div>
+<div class="rw-coin-lbl">BookB Coins</div>
+</div>
+<div class="rw-body">
+<div class="rw-how">Earn More</div>
+<div class="rw-card"><div class="rw-card-left"><h4>Refer a Friend</h4><span>Share your code with friends</span></div><div class="rw-card-coins">+50</div></div>
+<div class="rw-card"><div class="rw-card-left"><h4>Complete Profile</h4><span>Add photo and details</span></div><div class="rw-card-coins">+10</div></div>
+<div class="rw-card"><div class="rw-card-left"><h4>First Appointment</h4><span>Book and complete your first visit</span></div><div class="rw-card-coins">+25</div></div>
+<div class="rw-how" style="margin-top:18px">History</div>
+<div class="rw-hist-item"><div class="rw-hist-left"><span>Sign-up Bonus</span><small>9 Jan 2026</small></div><div class="rw-hist-amt rw-hist-plus">+25</div></div>
+<div class="rw-hist-item"><div class="rw-hist-left"><span>First Appointment</span><small>15 Jan 2026</small></div><div class="rw-hist-amt rw-hist-plus">+25</div></div>
+<div class="rw-hist-item"><div class="rw-hist-left"><span>Referral — Emma W.</span><small>28 Jan 2026</small></div><div class="rw-hist-amt rw-hist-plus">+50</div></div>
+<div class="rw-hist-item"><div class="rw-hist-left"><span>Profile Complete</span><small>2 Feb 2026</small></div><div class="rw-hist-amt rw-hist-plus">+10</div></div>
+</div>
+<div class="bn">
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="nt">Home</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="nt">Book</div></div>
+<div class="ni on"><div class="niw"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 21v-2a4 4 0 0 1 8 0v2"/></svg></div><div class="nt">Rewards</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg></div><div class="nt">Shop</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="nt">Profile</div></div>
+</div>
+</div></div><div class="pl">Rewards</div></div>
+
+</div>
+
+<!-- ================================ -->
+<!-- STYLIST FLOW                     -->
+<!-- ================================ -->
+<div class="slbl"><div class="roletag r-styl">Stylist</div><h2>Stylist Experience</h2><p>My Day · Availability · Client Notes</p></div>
+<div class="row">
+
+<!-- STYLIST DASHBOARD -->
+<div class="pw"><div class="ph"><div class="sc s-styl-dash">
+<div class="sd-head">
+<div class="sd-top">
+<div class="sd-greet"><h3>Good morning</h3><h2>James Robertson</h2></div>
+<div class="sd-icons">
+<div class="sd-ib"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+</div>
+</div>
+<div class="sd-status">
+<div class="sd-status-card"><div class="sd-status-val">7</div><div class="sd-status-lbl">Today</div></div>
+<div class="sd-status-card"><div class="sd-status-val gld">£423</div><div class="sd-status-lbl">Earned</div></div>
+<div class="sd-status-card"><div class="sd-status-val">3</div><div class="sd-status-lbl">Completed</div></div>
+</div>
+<div class="sd-checkin"><div class="sd-checkin-left"><span>Checked in at 8:45 AM</span><small>4h 15m elapsed</small></div><button class="sd-checkin-btn">Check Out</button></div>
+</div>
+<div class="sd-body">
+<div class="sd-sect"><div class="sd-sect-t">My Schedule</div><div class="sd-sect-l">Full day</div></div>
+<div class="sd-tl">
+<div class="sd-tl-item done"><div class="sd-tl-card"><div class="sd-tl-time">9:00 AM</div><div class="sd-tl-client">Anna Peters</div><div class="sd-tl-svc">Cut &amp; Blow Dry</div><div class="sd-tl-dur">45 min · Completed</div></div></div>
+<div class="sd-tl-item done"><div class="sd-tl-card"><div class="sd-tl-time">9:45 AM</div><div class="sd-tl-client">Mark Thompson</div><div class="sd-tl-svc">Gentleman's Cut</div><div class="sd-tl-dur">30 min · Completed</div></div></div>
+<div class="sd-tl-item done"><div class="sd-tl-card"><div class="sd-tl-time">10:30 AM</div><div class="sd-tl-client">Priya Shah</div><div class="sd-tl-svc">Root Touch-Up</div><div class="sd-tl-dur">45 min · Completed</div></div></div>
+<div class="sd-tl-item now"><div class="sd-tl-card"><div class="sd-tl-time">11:30 AM — NOW</div><div class="sd-tl-client">Sarah Mitchell</div><div class="sd-tl-svc">Balayage + Toner</div><div class="sd-tl-dur">120 min · In progress</div></div></div>
+<div class="sd-tl-item"><div class="sd-tl-card"><div class="sd-tl-time">2:00 PM</div><div class="sd-tl-client">Emma Wilson</div><div class="sd-tl-svc">Full Highlights</div><div class="sd-tl-dur">90 min</div></div></div>
+</div>
+</div>
+<div class="bn">
+<div class="ni on"><div class="niw"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="nt">My Day</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="nt">Schedule</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="nt">Hours</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="nt">Clients</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="nt">Stats</div></div>
+</div>
+</div></div><div class="pl">Stylist — My Day</div></div>
+
+<!-- STYLIST AVAILABILITY -->
+<div class="pw"><div class="ph"><div class="sc s-styl-avail">
+<div class="sa-head"><div class="sa-title">My Availability</div><div class="sa-sub">Manage your working hours</div></div>
+<div class="sa-body">
+<div class="sa-day"><div class="sa-day-head"><div class="sa-day-name">Monday</div><div class="sa-day-toggle"></div></div><div class="sa-slots"><div class="sa-slot">9:00–12:00</div><div class="sa-slot">1:00–5:00</div></div></div>
+<div class="sa-day"><div class="sa-day-head"><div class="sa-day-name">Tuesday</div><div class="sa-day-toggle"></div></div><div class="sa-slots"><div class="sa-slot">9:00–12:00</div><div class="sa-slot">1:00–5:00</div></div></div>
+<div class="sa-day"><div class="sa-day-head"><div class="sa-day-name">Wednesday</div><div class="sa-day-toggle"></div></div><div class="sa-slots"><div class="sa-slot">9:00–12:00</div><div class="sa-slot">1:00–6:00</div></div></div>
+<div class="sa-day"><div class="sa-day-head"><div class="sa-day-name">Thursday</div><div class="sa-day-toggle"></div></div><div class="sa-slots"><div class="sa-slot">10:00–2:00</div><div class="sa-slot">3:00–7:00</div></div></div>
+<div class="sa-day"><div class="sa-day-head"><div class="sa-day-name">Friday</div><div class="sa-day-toggle"></div></div><div class="sa-slots"><div class="sa-slot">9:00–12:00</div><div class="sa-slot">1:00–5:00</div></div></div>
+<div class="sa-day"><div class="sa-day-head"><div class="sa-day-name">Saturday</div><div class="sa-day-toggle"></div></div><div class="sa-slots"><div class="sa-slot">9:00–3:00</div></div></div>
+<div class="sa-day"><div class="sa-day-head"><div class="sa-day-name">Sunday</div><div class="sa-day-toggle off"></div></div><div class="sa-slots"><div class="sa-slot blocked">Closed</div></div></div>
+</div>
+<div class="bn">
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="nt">My Day</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="nt">Schedule</div></div>
+<div class="ni on"><div class="niw"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="nt">Hours</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="nt">Clients</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="nt">Stats</div></div>
+</div>
+</div></div><div class="pl">Stylist — Availability</div></div>
+
+<!-- STYLIST CLIENT NOTES -->
+<div class="pw"><div class="ph"><div class="sc s-styl-notes">
+<div class="sn-head"><div class="sn-title">Client Notes</div></div>
+<div class="sn-body">
+<div class="sn-client"><div class="sn-client-av">SM</div><div class="sn-client-info"><h4>Sarah Mitchell</h4><p>Prefers ash tones, sensitive scalp. Last formula: 7A + 8N 30 vol. Always runs 5 min late.</p><div class="sn-client-date">Updated 5 Feb 2026</div></div></div>
+<div class="sn-client"><div class="sn-client-av" style="background:var(--g5)">EW</div><div class="sn-client-info"><h4>Emma Wilson</h4><p>Fine hair, process gently. Allergic to PPD — always do patch test. Likes magazine recommendations.</p><div class="sn-client-date">Updated 1 Feb 2026</div></div></div>
+<div class="sn-client"><div class="sn-client-av" style="background:#4a6491">DC</div><div class="sn-client-info"><h4>David Chen</h4><p>Skin fade #2 sides, scissor top. Beard trim with straight razor. Tips well.</p><div class="sn-client-date">Updated 28 Jan 2026</div></div></div>
+<div class="sn-client"><div class="sn-client-av" style="background:var(--w500)">AP</div><div class="sn-client-info"><h4>Anna Peters</h4><p>Bob cut, blunt ends. No layers. Doesn't like product in hair. Tea with milk, no sugar.</p><div class="sn-client-date">Updated 20 Jan 2026</div></div></div>
+<div class="sn-client"><div class="sn-client-av" style="background:#2d7d46">PS</div><div class="sn-client-info"><h4>Priya Shah</h4><p>Virgin hair, first time colouring. Wants subtle warm highlights. Very thick hair — book extra time.</p><div class="sn-client-date">Updated 15 Jan 2026</div></div></div>
+</div>
+<div class="bn">
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="nt">My Day</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div class="nt">Schedule</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="nt">Hours</div></div>
+<div class="ni on"><div class="niw"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="nt">Clients</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="nt">Stats</div></div>
+</div>
+</div></div><div class="pl">Stylist — Client Notes</div></div>
+
+</div>
+
+<!-- ================================ -->
+<!-- ADMIN FLOW                       -->
+<!-- ================================ -->
+<div class="slbl"><div class="roletag r-admin">Admin</div><h2>Admin Dashboard</h2><p>Platform Overview · Salons · Subscriptions</p></div>
+<div class="row">
+
+<!-- ADMIN DASHBOARD -->
+<div class="pw"><div class="ph"><div class="sc s-admin-dash">
+<div class="ad-head">
+<div class="ad-top"><div class="ad-title">BookB Admin</div><div class="ad-badge">Super Admin</div></div>
+<div class="ad-kpis">
+<div class="ad-kpi"><div class="ad-kpi-val">142</div><div class="ad-kpi-lbl">Total Salons</div><div class="ad-kpi-delta ad-up">+12 this month</div></div>
+<div class="ad-kpi"><div class="ad-kpi-val gld">£8.2k</div><div class="ad-kpi-lbl">MRR</div><div class="ad-kpi-delta ad-up">+23%</div></div>
+<div class="ad-kpi"><div class="ad-kpi-val">1,847</div><div class="ad-kpi-lbl">Active Users</div><div class="ad-kpi-delta ad-up">+8%</div></div>
+<div class="ad-kpi"><div class="ad-kpi-val">94%</div><div class="ad-kpi-lbl">Uptime</div><div class="ad-kpi-delta ad-dn">-1%</div></div>
+</div>
+</div>
+<div class="ad-body">
+<div class="ad-chart"><div class="ad-chart-title">Salon Sign-ups</div>
+<div class="ad-bars">
+<div class="ad-bar-col"><div class="ad-bar ad-bar-n" style="height:30%"></div><div class="ad-bar-l">Sep</div></div>
+<div class="ad-bar-col"><div class="ad-bar ad-bar-n" style="height:45%"></div><div class="ad-bar-l">Oct</div></div>
+<div class="ad-bar-col"><div class="ad-bar ad-bar-n" style="height:40%"></div><div class="ad-bar-l">Nov</div></div>
+<div class="ad-bar-col"><div class="ad-bar ad-bar-n" style="height:60%"></div><div class="ad-bar-l">Dec</div></div>
+<div class="ad-bar-col"><div class="ad-bar ad-bar-n" style="height:55%"></div><div class="ad-bar-l">Jan</div></div>
+<div class="ad-bar-col"><div class="ad-bar ad-bar-g" style="height:80%"></div><div class="ad-bar-l">Feb</div></div>
+</div></div>
+<div class="ad-sect">Recent Salons</div>
+<div class="ad-salon-card"><div class="ad-salon-left"><div class="ad-salon-av">LH</div><div><div class="ad-salon-name">Luxe Hair Studio</div><div class="ad-salon-plan">Professional · 5 calendars</div></div></div><div class="ad-salon-status ad-active">Active</div></div>
+<div class="ad-salon-card"><div class="ad-salon-left"><div class="ad-salon-av" style="background:var(--g5)">BC</div><div><div class="ad-salon-name">Bella Cuts</div><div class="ad-salon-plan">Starter · 2 calendars</div></div></div><div class="ad-salon-status ad-trial">Trial</div></div>
+<div class="ad-salon-card"><div class="ad-salon-left"><div class="ad-salon-av" style="background:#4a6491">MV</div><div><div class="ad-salon-name">Maven Studio</div><div class="ad-salon-plan">Professional · 8 calendars</div></div></div><div class="ad-salon-status ad-active">Active</div></div>
+<div class="ad-salon-card"><div class="ad-salon-left"><div class="ad-salon-av" style="background:var(--err)">TS</div><div><div class="ad-salon-name">The Strand</div><div class="ad-salon-plan">Starter · 1 calendar</div></div></div><div class="ad-salon-status ad-expired">Expired</div></div>
+</div>
+<div class="bn">
+<div class="ni on"><div class="niw"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="nt">Overview</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div><div class="nt">Salons</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div><div class="nt">Plans</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/></svg></div><div class="nt">Coupons</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82.67V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9V9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9c.26.6.85 1 1.51 1H21a2 2 0 0 1 0 4h-.09c-.66 0-1.25.4-1.51 1z"/></svg></div><div class="nt">Config</div></div>
+</div>
+</div></div><div class="pl">Admin — Overview</div></div>
+
+<!-- ADMIN SUBSCRIPTIONS -->
+<div class="pw"><div class="ph"><div class="sc s-admin-subs">
+<div class="as-head"><div class="as-title">Subscription Plans</div><div class="as-sub">Manage pricing tiers</div></div>
+<div class="as-body">
+<div class="as-plan"><div class="as-plan-name">Solo Stylist</div><div class="as-plan-price">£15<span>/month</span></div><div class="as-plan-feat">1 calendar · 1 user<br>Appointments + POS<br>Basic analytics</div><div class="as-plan-count">34 salons</div></div>
+<div class="as-plan featured"><div class="as-plan-name">Professional</div><div class="as-plan-price">£49<span>/month</span></div><div class="as-plan-feat">5 calendars · 10 users<br>Full features + reports<br>Priority support</div><div class="as-plan-count">78 salons</div></div>
+<div class="as-plan"><div class="as-plan-name">Business</div><div class="as-plan-price">£89<span>/month</span></div><div class="as-plan-feat">15 calendars · 25 users<br>Multi-location<br>Custom branding</div><div class="as-plan-count">22 salons</div></div>
+<div class="as-plan"><div class="as-plan-name">Enterprise</div><div class="as-plan-price">£125<span>/month</span></div><div class="as-plan-feat">Unlimited calendars + users<br>API access · White label<br>Dedicated account manager</div><div class="as-plan-count">8 salons</div></div>
+</div>
+<div class="bn">
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="nt">Overview</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div><div class="nt">Salons</div></div>
+<div class="ni on"><div class="niw"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div><div class="nt">Plans</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/></svg></div><div class="nt">Coupons</div></div>
+<div class="ni"><div class="niw"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg></div><div class="nt">Config</div></div>
+</div>
+</div></div><div class="pl">Admin — Plans</div></div>
+
+</div>
+
+<div class="ft2">BookB — One App · Four Experiences</div>
+</body></html>
