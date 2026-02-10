@@ -12,6 +12,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   isFirstLogin: boolean;
+  isDemo: boolean;
 
   setUser: (user: User) => void;
   setToken: (token: string) => void;
@@ -20,6 +21,7 @@ interface AuthState {
   setStylistId: (stylistId: string) => void;
   setIsFirstLogin: (isFirst: boolean) => void;
   login: (params: { user: User; token: string; role: UserRole; isFirstLogin?: boolean }) => Promise<void>;
+  demoLogin: (role: UserRole) => void;
   logout: () => Promise<void>;
   restoreSession: () => Promise<string | null>;
   setLoading: (loading: boolean) => void;
@@ -34,6 +36,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isLoading: true,
   isFirstLogin: false,
+  isDemo: false,
 
   setUser: (user) => {
     const salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || null;
@@ -67,6 +70,79 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
+  demoLogin: (role: UserRole) => {
+    const demoUser: User = {
+      _id: 'demo_user_001',
+      name: 'Demo User',
+      email: 'demo@bookb.app',
+      userName: 'demo',
+      phone: '5551234567',
+      address: '123 Demo Street',
+      photo: '',
+      photoKey: '',
+      photoDark: '',
+      photoKeyDark: '',
+      role,
+      stylistCount: role === 'salon' ? 5 : 0,
+      salon: role === 'salon' || role === 'stylist' ? 'demo_salon_001' : '',
+      stylist: role === 'stylist' ? 'demo_stylist_001' : '',
+      passwordChangedAt: '',
+      active: true,
+      gender: 'other' as const,
+      age: 30,
+      userDeviceID: '',
+      dob: '1995-01-01',
+      appMenu: {},
+      packageName: 'com.bookb.app',
+      appID: '',
+      isSpecialApp: false,
+      webUrl: '',
+      services: [],
+      startTime: '09:00',
+      endTime: '18:00',
+      lunchStartTime: '12:00',
+      lunchEndTime: '13:00',
+      recurringType: 'week' as const,
+      intervalTime: '30',
+      isBreakTimeCompulsory: false,
+      clientNote: '',
+      shippingAddress: {},
+      billingAddress: {},
+      maxCalendar: 30,
+      subscription: [],
+      cancel_at_period_end: false,
+      platform: 'android' as const,
+      deviceInfo: '',
+      deviceId: '',
+      accessToken: '',
+      description: 'Demo account',
+      userNote: '',
+      countryCode: '+44',
+      currency: 'GBP',
+      availableRole: [role],
+      isMultiRole: false,
+      addedFrom: 'dashboard' as const,
+      referralCode: '',
+      referredBy: '',
+      coins: 100,
+      isFirstLogin: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    set({
+      user: demoUser,
+      token: 'demo_token',
+      role,
+      salonId: role === 'salon' || role === 'stylist' ? 'demo_salon_001' : null,
+      stylistId: role === 'stylist' ? 'demo_stylist_001' : null,
+      isAuthenticated: true,
+      isLoading: false,
+      isFirstLogin: false,
+      isDemo: true,
+    });
+  },
+
   logout: async () => {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     set({
@@ -78,6 +154,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       isAuthenticated: false,
       isLoading: false,
       isFirstLogin: false,
+      isDemo: false,
     });
   },
 

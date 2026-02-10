@@ -14,8 +14,17 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useCheckMobile } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
+import { UserRole } from '@/api/types';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+
+const DEMO_ROLES: { role: UserRole; label: string }[] = [
+  { role: 'salon', label: 'Salon Owner' },
+  { role: 'stylist', label: 'Stylist' },
+  { role: 'user', label: 'Customer' },
+  { role: 'admin', label: 'Admin' },
+];
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -23,6 +32,7 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const checkMobile = useCheckMobile();
+  const demoLogin = useAuthStore((s) => s.demoLogin);
 
   const handleSendOtp = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -52,6 +62,28 @@ export default function LoginScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/(auth)/register');
   }, [router]);
+
+  const handleDemoLogin = useCallback(async (role: UserRole) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    demoLogin(role);
+    switch (role) {
+      case 'salon':
+      case 'manager':
+        router.replace('/(salon)/');
+        break;
+      case 'stylist':
+        router.replace('/(stylist)/');
+        break;
+      case 'admin':
+      case 'superadmin':
+        router.replace('/(admin)/');
+        break;
+      case 'user':
+      default:
+        router.replace('/(customer)/');
+        break;
+    }
+  }, [demoLogin, router]);
 
   return (
     <LinearGradient
@@ -127,6 +159,26 @@ export default function LoginScreen() {
             >
               <Text style={styles.emailButtonText}>Sign in with Email</Text>
             </TouchableOpacity>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.duration(600).delay(900)} style={styles.demoSection}>
+            <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>demo mode</Text>
+              <View style={styles.dividerLine} />
+            </View>
+            <View style={styles.demoGrid}>
+              {DEMO_ROLES.map(({ role, label }) => (
+                <TouchableOpacity
+                  key={role}
+                  style={styles.demoButton}
+                  onPress={() => handleDemoLogin(role)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.demoButtonText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -253,5 +305,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fontFamilies.bodyMedium,
     letterSpacing: 0.8,
+  },
+  demoSection: {
+    width: '100%',
+    marginTop: 8,
+    paddingBottom: 32,
+  },
+  demoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  demoButton: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: 'rgba(196,151,61,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(196,151,61,0.2)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  demoButtonText: {
+    color: colors.goldLight,
+    fontSize: 12,
+    fontFamily: fontFamilies.bodyMedium,
+    letterSpacing: 0.5,
   },
 });
