@@ -29,15 +29,16 @@ interface Service {
   duration: string;
   price: number;
   category: string;
+  mainServiceId: string;
 }
 
 const SERVICES: Service[] = [
-  { id: '1', name: 'Balayage + Trim', duration: '90 min', price: 185, category: 'Color' },
-  { id: '2', name: 'Full Color', duration: '120 min', price: 220, category: 'Color' },
-  { id: '3', name: 'Haircut + Layers', duration: '60 min', price: 85, category: 'Cut' },
-  { id: '4', name: 'Keratin Treatment', duration: '120 min', price: 250, category: 'Treatment' },
-  { id: '5', name: 'Blowout & Style', duration: '45 min', price: 65, category: 'Styling' },
-  { id: '6', name: 'Root Touch-Up', duration: '60 min', price: 95, category: 'Color' },
+  { id: '1', name: 'Balayage + Trim', duration: '90 min', price: 185, category: 'Color', mainServiceId: '' },
+  { id: '2', name: 'Full Color', duration: '120 min', price: 220, category: 'Color', mainServiceId: '' },
+  { id: '3', name: 'Haircut + Layers', duration: '60 min', price: 85, category: 'Cut', mainServiceId: '' },
+  { id: '4', name: 'Keratin Treatment', duration: '120 min', price: 250, category: 'Treatment', mainServiceId: '' },
+  { id: '5', name: 'Blowout & Style', duration: '45 min', price: 65, category: 'Styling', mainServiceId: '' },
+  { id: '6', name: 'Root Touch-Up', duration: '60 min', price: 95, category: 'Color', mainServiceId: '' },
 ];
 
 interface Stylist {
@@ -101,41 +102,50 @@ export default function NewAppointmentScreen() {
   const apiServices = useMemo(() => {
     if (isDemo || !serviceGroupsData) return SERVICES;
     const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : (serviceGroupsData as any)?.result || (serviceGroupsData as any)?.serviceGroups || [];
-    const flat: typeof SERVICES = [];
+    const flat: { id: string; name: string; duration: string; price: number; category: string; mainServiceId: string }[] = [];
     groups.forEach((group: any) => {
       const mainSvc = group.mainService || group.category;
-      if (mainSvc) {
+      const mainId = typeof mainSvc === 'object' ? (mainSvc?._id || mainSvc?.id || '') : '';
+      const rawSubs = group.subServices || group.subService || [];
+      (Array.isArray(rawSubs) ? rawSubs : []).forEach((sub: any) => {
+        const subId = sub._id || sub.id;
+        if (subId) {
+          flat.push({
+            id: subId,
+            name: sub.title || 'Sub-service',
+            duration: `${sub.requiredTime || 30} min`,
+            price: sub.charges || 0,
+            category: mainSvc?.title || 'All',
+            mainServiceId: mainId,
+          });
+        }
+      });
+      // Only add main service if there are no sub-services
+      if (mainId && rawSubs.length === 0) {
         flat.push({
-          id: mainSvc._id,
+          id: mainId,
           name: mainSvc.title || 'Service',
           duration: `${mainSvc.requiredTime || 60} min`,
           price: mainSvc.charges || 0,
-          category: 'All',
+          category: mainSvc.title || 'All',
+          mainServiceId: mainId,
         });
       }
-      const rawSubs = group.subServices || group.subService || [];
-      (Array.isArray(rawSubs) ? rawSubs : []).forEach((sub: any) => {
-        flat.push({
-          id: sub._id,
-          name: sub.title || 'Sub-service',
-          duration: `${sub.requiredTime || 30} min`,
-          price: sub.charges || 0,
-          category: 'All',
-        });
-      });
     });
-    return flat.length > 0 ? flat : SERVICES;
+    return flat.length > 0 ? flat : SERVICES.map((s) => ({ ...s, mainServiceId: '' }));
   }, [isDemo, serviceGroupsData]);
 
   const apiStylists = useMemo(() => {
     if (isDemo || !stylistsData) return STYLISTS;
     const list = Array.isArray(stylistsData) ? stylistsData : (stylistsData as any)?.result || (stylistsData as any)?.users || (stylistsData as any)?.stylists || [];
-    const mapped = list.map((s: any) => ({
-      id: s._id || s.id,
-      name: s.name || 'Stylist',
-      initial: (s.name || 'S')[0].toUpperCase(),
-      status: (s.active !== false ? 'available' : 'busy') as 'available' | 'busy',
-    }));
+    const mapped = list
+      .filter((s: any) => s._id || s.id)
+      .map((s: any) => ({
+        id: String(s._id || s.id),
+        name: s.name || 'Stylist',
+        initial: (s.name || 'S')[0].toUpperCase(),
+        status: (s.active !== false ? 'available' : 'busy') as 'available' | 'busy',
+      }));
     return mapped.length > 0 ? mapped : STYLISTS;
   }, [isDemo, stylistsData]);
 
@@ -410,26 +420,42 @@ export default function NewAppointmentScreen() {
               Alert.alert('Success', 'Appointment booked', [{ text: 'OK', onPress: () => router.back() }]);
               return;
             }
-            if (!selectedService || !selectedStylist || !selectedTime) {
-              Alert.alert('Validation', 'Please select a service, stylist, date and time');
+            const missing: string[] = [];
+            if (!selectedService) missing.push('service');
+            if (!selectedStylist) missing.push('stylist');
+            if (!selectedTime) missing.push('time');
+            if (missing.length > 0) {
+              Alert.alert('Validation', `Please select a ${missing.join(', ')}`);
               return;
             }
             const selectedDayObj = DAYS[parseInt(selectedDay.replace('day-', ''))];
-            const appointmentDate = selectedDayObj?.full?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+            const dayDate = selectedDayObj ? new Date(selectedDayObj.full) : new Date();
+            const mm = String(dayDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(dayDate.getDate()).padStart(2, '0');
+            const yyyy = dayDate.getFullYear();
+            const appointmentDate = `${mm}/${dd}/${yyyy}`;
+
+            // Convert 12h time to HH:mm 24h
+            const timeMatch = selectedTime!.match(/(\d+):(\d+)\s*(AM|PM)/i);
+            let hour24 = timeMatch ? parseInt(timeMatch[1]) : 9;
+            if (timeMatch && timeMatch[3].toUpperCase() === 'PM' && hour24 !== 12) hour24 += 12;
+            if (timeMatch && timeMatch[3].toUpperCase() === 'AM' && hour24 === 12) hour24 = 0;
+            const time24 = `${String(hour24).padStart(2, '0')}:${timeMatch ? timeMatch[2] : '00'}`;
+
             const svc = displayServices.find((s) => s.id === selectedService);
             createAppointmentMutation.mutate(
               {
                 data: {
                   appointmentDate,
                   timeData: {
-                    timeAsADate: new Date().toISOString(),
-                    timeAsAString: selectedTime,
+                    timeAsADate: time24,
+                    timeAsAString: selectedTime!,
                     id: '',
                   },
                   salon: salonId || '',
-                  stylistId: selectedStylist,
-                  mainService: selectedService,
-                  subService: '',
+                  stylistId: selectedStylist!,
+                  mainService: svc?.mainServiceId || selectedService!,
+                  subService: selectedService!,
                   comment: notes,
                   requiredDuration: parseInt(svc?.duration || '60') || 60,
                 },
