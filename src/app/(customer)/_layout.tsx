@@ -154,6 +154,8 @@ export default function CustomerLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="appointment" options={{ href: null }} />
     </Tabs>
   );
 }
