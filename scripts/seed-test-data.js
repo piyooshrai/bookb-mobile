@@ -25,7 +25,10 @@
 const axios = require('axios');
 
 const API_BASE = 'https://bookb.the-algo.com/api/v1';
-const OFFSET = new Date().getTimezoneOffset();
+// Miami EST = UTC-5 = offset 300. Use your local offset if running from a different timezone.
+// NOTE: new Date().getTimezoneOffset() returns 0 on servers/containers (UTC), which breaks
+// appointment date calculations. Hardcode to Miami EST for this salon.
+const OFFSET = 300;
 
 // ─── Credentials ────────────────────────────────────────────────────────────
 const SALON_OWNER = {
@@ -798,6 +801,7 @@ async function createAppointments() {
 
   const today = new Date();
   let created = 0;
+  let failed = 0;
 
   // Create 3-5 appointments per day for the next 14 days
   for (let d = 0; d < 14; d++) {
@@ -841,10 +845,12 @@ async function createAppointments() {
         if (timeParts[3].toUpperCase() === 'AM' && hour === 12) hour = 0;
         const time24 = `${hour.toString().padStart(2, '0')}:${timeParts[2]}`;
 
+        // Match the mobile app salon flow: timeAsADate = current ISO timestamp
+        // (not a constructed UTC time, which confuses the API's date processing)
         const res = await api.post('/appointment/add-appointment-from-dashboard', {
           appointmentDate: appointmentDate,
           timeData: {
-            timeAsADate: `${appointmentDate}T${time24}:00.000Z`,
+            timeAsADate: new Date().toISOString(),
             timeAsAString: time,
             id: '',
           },
@@ -862,16 +868,92 @@ async function createAppointments() {
           params: { offset: OFFSET },
         });
 
-        created++;
-        log('✅', `  ${getDateString(date)} ${time} - ${client.name} → ${service.title} with ${stylist.name}`);
+        // Check actual API response status
+        if (res.data?.status === false) {
+          log('⚠️', `  ${getDateString(date)} ${time}: API returned false - ${res.data?.message}`);
+          failed++;
+        } else {
+          created++;
+          if (created <= 3) {
+            // Log first few responses for debugging
+            logResponse(`appointment:${getDateString(date)}`, res);
+          }
+          log('✅', `  ${getDateString(date)} ${time} - ${client.name} → ${service.title} with ${stylist.name}`);
+        }
       } catch (e) {
+        failed++;
         log('⚠️', `  ${getDateString(date)} ${time}: ${e.response?.data?.message || e.message}`);
       }
       await sleep(300);
     }
   }
 
-  log('📋', `Created ${created} appointments total`);
+  log('📋', `Created ${created} appointments total (${failed} failed)`);
+}
+
+// ─── Step 8: Verify Appointments ──────────────────────────────────────────────
+
+async function verifyAppointments() {
+  log('🔍', 'Verifying appointments are queryable...');
+
+  const today = new Date();
+  const fromDate = formatDate(today);
+  const toDate = new Date(today);
+  toDate.setDate(today.getDate() + 14);
+  const toDateStr = formatDate(toDate);
+
+  // Query 1: get-appointment-from-dashboard (what the web dashboard uses)
+  try {
+    const res = await api.post('/appointment/get-appointment-from-dashboard', {
+      salon: salonId,
+      fromDate: fromDate,
+      toDate: toDateStr,
+      offset: OFFSET,
+    });
+    const appointments = res.data?.data;
+    if (Array.isArray(appointments)) {
+      log('✅', `  Dashboard query: ${appointments.length} appointments found (${fromDate} to ${toDateStr})`);
+      if (appointments.length > 0) {
+        const apt = appointments[0];
+        log('ℹ️', `  Sample: ${apt.dateAsAString} ${apt.timeAsAString} | status=${apt.status} | offset=${apt.offset}`);
+      }
+    } else {
+      log('⚠️', `  Dashboard query returned non-array: ${JSON.stringify(res.data).substring(0, 300)}`);
+    }
+  } catch (e) {
+    log('⚠️', `  Dashboard query failed: ${e.response?.data?.message || e.message}`);
+  }
+
+  // Query 2: get-appointment-by-stylist (alternate query path)
+  if (stylistIds.length > 0) {
+    try {
+      const res = await api.get('/appointment/get-appointment-by-stylist', {
+        params: { pageNumber: 1, pageSize: 10, stylistId: stylistIds[0].id },
+      });
+      const data = res.data?.data;
+      const count = data?.result?.length || 0;
+      const total = data?.totalPageSize || 0;
+      log('✅', `  Stylist query (${stylistIds[0].name}): ${count} appointments (${total} total pages)`);
+    } catch (e) {
+      log('⚠️', `  Stylist query failed: ${e.response?.data?.message || e.message}`);
+    }
+  }
+
+  // Query 3: KPI endpoints
+  try {
+    const convRes = await api.get('/appointment/appointment-conversion-rate', { params: { salon: salonId } });
+    log('ℹ️', `  Conversion rate: ${JSON.stringify(convRes.data?.data)}`);
+  } catch (e) {
+    log('⚠️', `  Conversion rate: ${e.response?.data?.message || e.message}`);
+  }
+
+  // Query 4: getAppointmentsByMonth
+  try {
+    const monthRes = await api.get(`/salon/getAppointmentsByMonth/${salonId}`);
+    log('ℹ️', `  Appointments by month: ${JSON.stringify(monthRes.data?.data).substring(0, 200)}`);
+  } catch (e) {
+    log('⚠️', `  Appointments by month: ${e.response?.data?.message || e.message}`);
+  }
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -889,6 +971,7 @@ async function main() {
     await createClients();
     await setupAvailability();
     await createAppointments();
+    await verifyAppointments();
 
     console.log('\n╔══════════════════════════════════════════════════════╗');
     console.log('║        LOGIN CREDENTIALS                            ║');
