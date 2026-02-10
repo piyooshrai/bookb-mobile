@@ -1135,7 +1135,7 @@ async function createAppointments() {
       }
 
       try {
-        var appointmentDate = formatDate(date);
+        var appointmentDate = formatDateMMDDYYYY(date);
         // Convert time string to 24h for API
         var timeParts = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
         var hour = parseInt(timeParts[1]);
