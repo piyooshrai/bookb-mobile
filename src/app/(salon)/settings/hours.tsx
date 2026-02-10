@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Polyline, Line } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useBusinessHours, useCreateBulkAvailability } from '@/hooks/useAvailability';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -34,12 +36,45 @@ const INITIAL_SCHEDULE: DaySchedule[] = [
 
 export default function BusinessHoursScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+
+  // --- API hooks ---
+  const { data: hoursData, isLoading } = useBusinessHours();
+  const bulkAvailabilityMutation = useCreateBulkAvailability();
+  const [isSaving, setIsSaving] = useState(false);
+
   const [schedule, setSchedule] = useState(INITIAL_SCHEDULE);
   const [lunchBreak, setLunchBreak] = useState(true);
   const [lunchStart] = useState('12:00 PM');
   const [lunchEnd] = useState('1:00 PM');
   const [interval, setInterval] = useState(30);
   const [maxDays, setMaxDays] = useState(30);
+
+  // Populate from API once loaded
+  useEffect(() => {
+    if (isDemo || !hoursData) return;
+    const apiHours = hoursData.slots || hoursData;
+    if (!Array.isArray(apiHours)) return;
+    const dayMap = new Map<string, { open: string; close: string }>();
+    apiHours.forEach((day: any) => {
+      const slots = day.slot || [];
+      if (slots.length > 0) {
+        dayMap.set(day.day?.toLowerCase(), {
+          open: slots[0].startTime || '9:00 AM',
+          close: slots[slots.length - 1].endTime || '7:00 PM',
+        });
+      }
+    });
+    if (dayMap.size > 0) {
+      setSchedule((prev) =>
+        prev.map((d) => {
+          const apiDay = dayMap.get(d.day.toLowerCase());
+          if (apiDay) return { ...d, enabled: true, open: apiDay.open, close: apiDay.close };
+          return { ...d, enabled: false };
+        }),
+      );
+    }
+  }, [isDemo, hoursData]);
 
   const toggleDay = (index: number) => {
     setSchedule((prev) =>
@@ -192,8 +227,41 @@ export default function BusinessHoursScreen() {
         </View>
 
         {/* Save Button */}
-        <TouchableOpacity style={styles.saveButton} activeOpacity={0.7} onPress={() => Alert.alert('Success', 'Business hours updated', [{ text: 'OK' }])}>
-          <Text style={styles.saveButtonText}>Save Changes</Text>
+        <TouchableOpacity
+          style={styles.saveButton}
+          activeOpacity={0.7}
+          onPress={() => {
+            if (isDemo) {
+              Alert.alert('Success', 'Business hours updated', [{ text: 'OK' }]);
+              return;
+            }
+            const slots = schedule
+              .filter((d) => d.enabled)
+              .map((d) => ({
+                day: d.day.toLowerCase(),
+                slot: [{ startTime: d.open, endTime: d.close }],
+              }));
+            setIsSaving(true);
+            bulkAvailabilityMutation.mutate(
+              { data: { slots }, offset: new Date().getTimezoneOffset() },
+              {
+                onSuccess: () => {
+                  setIsSaving(false);
+                  Alert.alert('Success', 'Business hours updated', [{ text: 'OK' }]);
+                },
+                onError: (err: any) => {
+                  setIsSaving(false);
+                  Alert.alert('Error', err?.message || 'Failed to save business hours');
+                },
+              },
+            );
+          }}
+        >
+          {isSaving ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.saveButtonText}>Save Changes</Text>
+          )}
         </TouchableOpacity>
 
         <View style={{ height: 32 }} />

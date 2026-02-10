@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useAppointmentsByStylist, useChangeAppointmentStatus } from '@/hooks/useAppointments';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import type { Appointment as ApiAppointment } from '@/api/types';
 
 type Appointment = {
   id: string;
@@ -66,9 +69,73 @@ function getTodayIndex(): number {
   return 0; // default to Monday on weekends
 }
 
+function mapApiToScreenStatus(status: string): 'confirmed' | 'pending' | 'completed' {
+  if (status === 'completed') return 'completed';
+  if (status === 'confirmed') return 'confirmed';
+  return 'pending';
+}
+
+function mapApiAppointment(apt: ApiAppointment): Appointment {
+  const serviceName = typeof apt.mainService === 'object' ? (apt.mainService as any)?.name || '' : '';
+  return {
+    id: apt._id,
+    time: apt.timeAsAString || '',
+    endTime: '',
+    client: apt.userName || (typeof apt.user === 'object' ? (apt.user as any)?.name || '' : ''),
+    service: serviceName || 'Appointment',
+    duration: apt.requiredDuration ? `${apt.requiredDuration} min` : '',
+    status: mapApiToScreenStatus(apt.status),
+  };
+}
+
 export default function WeeklyScheduleScreen() {
   const [selectedDay, setSelectedDay] = useState(getTodayIndex());
-  const appointments = MOCK_SCHEDULE[DAYS[selectedDay]];
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const stylistId = useAuthStore((s) => s.stylistId);
+
+  // API hook - fetch appointments for the stylist
+  const { data: apiData, isLoading } = useAppointmentsByStylist(
+    { pageNumber: 1, pageSize: 100, stylistId: stylistId || undefined },
+    !isDemo && !!stylistId,
+  );
+
+  const changeStatus = useChangeAppointmentStatus();
+
+  // Group API appointments by weekday
+  const apiSchedule = useMemo(() => {
+    if (isDemo || !apiData?.result) return null;
+    const grouped: Record<string, Appointment[]> = { Mon: [], Tue: [], Wed: [], Thu: [], Fri: [] };
+    const dayMap: Record<string, string> = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri' };
+
+    for (const apt of apiData.result) {
+      const dayKey = apt.weekDay ? dayMap[apt.weekDay] : null;
+      // Also try deriving from dateAsAString
+      let resolvedDay = dayKey;
+      if (!resolvedDay && apt.dateAsAString) {
+        const d = new Date(apt.dateAsAString);
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const name = dayNames[d.getDay()];
+        if (name && grouped[name] !== undefined) resolvedDay = name;
+      }
+      if (resolvedDay && grouped[resolvedDay]) {
+        grouped[resolvedDay].push(mapApiAppointment(apt));
+      }
+    }
+    return grouped;
+  }, [isDemo, apiData]);
+
+  const schedule = apiSchedule || MOCK_SCHEDULE;
+  const appointments = schedule[DAYS[selectedDay]] || [];
+
+  const handleAccept = (apt: Appointment) => {
+    if (isDemo) return;
+    changeStatus.mutate({ id: apt.id, data: { status: 'confirmed', availabilityId: '', timeDataId: '' } });
+  };
+
+  const handleReject = (apt: Appointment) => {
+    if (isDemo) return;
+    changeStatus.mutate({ id: apt.id, data: { status: 'canceled', availabilityId: '', timeDataId: '' } });
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -81,7 +148,7 @@ export default function WeeklyScheduleScreen() {
       <View style={styles.dayTabs}>
         {DAYS.map((day, i) => {
           const isActive = i === selectedDay;
-          const count = MOCK_SCHEDULE[day].length;
+          const count = (schedule[day] || []).length;
           return (
             <Pressable
               key={day}
@@ -97,6 +164,10 @@ export default function WeeklyScheduleScreen() {
 
       {/* Appointments */}
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        {!isDemo && isLoading && (
+          <ActivityIndicator size="small" color={colors.gold} style={{ marginVertical: 12 }} />
+        )}
+
         {appointments.map((apt, i) => (
           <View key={apt.id} style={styles.aptCard}>
             <View style={styles.aptTimeCol}>
@@ -125,6 +196,17 @@ export default function WeeklyScheduleScreen() {
                   </Text>
                 </View>
               </View>
+              {/* Accept / Reject for pending appointments */}
+              {apt.status === 'pending' && !isDemo && (
+                <View style={styles.actionRow}>
+                  <Pressable style={styles.acceptBtn} onPress={() => handleAccept(apt)}>
+                    <Text style={styles.acceptBtnText}>Accept</Text>
+                  </Pressable>
+                  <Pressable style={styles.rejectBtn} onPress={() => handleReject(apt)}>
+                    <Text style={styles.rejectBtnText}>Reject</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           </View>
         ))}
@@ -363,5 +445,35 @@ const styles = StyleSheet.create({
     width: 1,
     height: 32,
     backgroundColor: colors.border,
+  },
+  // Action buttons
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  acceptBtn: {
+    flex: 1,
+    backgroundColor: colors.successLight,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  acceptBtnText: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: 12,
+    color: colors.successDark,
+  },
+  rejectBtn: {
+    flex: 1,
+    backgroundColor: colors.errorLight,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  rejectBtnText: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: 12,
+    color: colors.error,
   },
 });

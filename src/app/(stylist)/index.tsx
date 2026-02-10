@@ -1,7 +1,9 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Line } from 'react-native-svg';
 import { useAuthStore } from '@/stores/authStore';
+import { useStylistDayAppointments, useStylistLatestAppointment } from '@/hooks/useStylist';
+import { useStylistGeneralCount } from '@/hooks/useReports';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -16,12 +18,72 @@ const MOCK_TIMELINE = [
 
 const MOCK_DAY_STATS = { totalBookings: 6, completed: 2, revenue: 250, nextBreak: '1:00 PM' };
 
+function mapApiStatus(status: string): 'completed' | 'in-progress' | 'upcoming' {
+  if (status === 'completed') return 'completed';
+  if (status === 'confirmed' || status === 'waiting') return 'in-progress';
+  return 'upcoming';
+}
+
 export default function MyDayScreen() {
   const user = useAuthStore((s) => s.user);
+  const isDemo = useAuthStore((s) => s.isDemo);
   const greeting = getGreeting();
   const firstName = user?.name?.split(' ')[0] || 'Stylist';
 
-  const nextApt = MOCK_TIMELINE.find((a) => a.status === 'in-progress') || MOCK_TIMELINE.find((a) => a.status === 'upcoming');
+  const todayDate = new Date().toISOString().split('T')[0];
+
+  // API hooks
+  const { data: dayAppointments, isLoading: loadingDay } = useStylistDayAppointments(todayDate, !isDemo);
+  const { data: latestApt, isLoading: loadingLatest } = useStylistLatestAppointment();
+  const { data: generalCount, isLoading: loadingGeneral } = useStylistGeneralCount();
+
+  // Map API data to timeline format
+  const timeline = !isDemo && dayAppointments
+    ? dayAppointments.map((apt, i) => ({
+        id: apt.id || String(i),
+        time: apt.startTime,
+        client: apt.userName,
+        service: apt.service || apt.description,
+        duration: apt.startTime && apt.endTime ? `${apt.startTime} - ${apt.endTime}` : '',
+        price: apt.price || 0,
+        status: mapApiStatus(apt.status),
+      }))
+    : MOCK_TIMELINE;
+
+  // Build day stats from API or mock
+  const dayStats = !isDemo && dayAppointments
+    ? {
+        totalBookings: dayAppointments.length,
+        completed: dayAppointments.filter((a) => a.status === 'completed').length,
+        revenue: dayAppointments.filter((a) => a.status === 'completed').reduce((sum, a) => sum + (a.price || 0), 0),
+        nextBreak: '--',
+      }
+    : !isDemo && generalCount
+      ? {
+          totalBookings: (generalCount as any)?.appointments ?? MOCK_DAY_STATS.totalBookings,
+          completed: (generalCount as any)?.completed ?? MOCK_DAY_STATS.completed,
+          revenue: (generalCount as any)?.revenue ?? MOCK_DAY_STATS.revenue,
+          nextBreak: MOCK_DAY_STATS.nextBreak,
+        }
+      : MOCK_DAY_STATS;
+
+  // Next appointment card - use latest appointment from API or derive from timeline
+  const nextAptFromApi = !isDemo && latestApt
+    ? {
+        time: (latestApt as any)?.timeAsAString || (latestApt as any)?.startTime || '',
+        client: (latestApt as any)?.userName || '',
+        service: typeof (latestApt as any)?.mainService === 'object'
+          ? (latestApt as any)?.mainService?.name || ''
+          : (latestApt as any)?.service || '',
+        duration: (latestApt as any)?.requiredDuration ? `${(latestApt as any).requiredDuration} min` : '',
+        price: (latestApt as any)?.price || 0,
+        status: 'upcoming' as const,
+      }
+    : null;
+
+  const nextApt = nextAptFromApi || timeline.find((a) => a.status === 'in-progress') || timeline.find((a) => a.status === 'upcoming');
+
+  const isLoading = !isDemo && (loadingDay || loadingLatest || loadingGeneral);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -36,17 +98,21 @@ export default function MyDayScreen() {
           </View>
         </View>
         <View style={styles.quickStats}>
-          <View style={styles.qsItem}><Text style={styles.qsValue}>{MOCK_DAY_STATS.totalBookings}</Text><Text style={styles.qsLabel}>Bookings</Text></View>
+          <View style={styles.qsItem}><Text style={styles.qsValue}>{dayStats.totalBookings}</Text><Text style={styles.qsLabel}>Bookings</Text></View>
           <View style={styles.qsDivider} />
-          <View style={styles.qsItem}><Text style={styles.qsValue}>{MOCK_DAY_STATS.completed}</Text><Text style={styles.qsLabel}>Done</Text></View>
+          <View style={styles.qsItem}><Text style={styles.qsValue}>{dayStats.completed}</Text><Text style={styles.qsLabel}>Done</Text></View>
           <View style={styles.qsDivider} />
-          <View style={styles.qsItem}><Text style={styles.qsValue}>${MOCK_DAY_STATS.revenue}</Text><Text style={styles.qsLabel}>Earned</Text></View>
+          <View style={styles.qsItem}><Text style={styles.qsValue}>${dayStats.revenue}</Text><Text style={styles.qsLabel}>Earned</Text></View>
           <View style={styles.qsDivider} />
-          <View style={styles.qsItem}><Text style={styles.qsValue}>{MOCK_DAY_STATS.nextBreak}</Text><Text style={styles.qsLabel}>Break</Text></View>
+          <View style={styles.qsItem}><Text style={styles.qsValue}>{dayStats.nextBreak}</Text><Text style={styles.qsLabel}>Break</Text></View>
         </View>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        {isLoading && (
+          <ActivityIndicator size="small" color={colors.gold} style={{ marginVertical: 12 }} />
+        )}
+
         {nextApt && (
           <View style={styles.nextCard}>
             <View style={styles.nextHeader}>
@@ -73,11 +139,11 @@ export default function MyDayScreen() {
               <Text style={styles.cardTitle}>Today's Timeline</Text>
             </View>
           </View>
-          {MOCK_TIMELINE.map((apt, i) => (
+          {timeline.map((apt, i) => (
             <View key={apt.id} style={styles.tlRow}>
               <View style={styles.tlLeft}>
                 <View style={[styles.tlDot, apt.status === 'completed' && styles.dotDone, apt.status === 'in-progress' && styles.dotNow, apt.status === 'upcoming' && styles.dotNext]} />
-                {i < MOCK_TIMELINE.length - 1 && <View style={styles.tlLine} />}
+                {i < timeline.length - 1 && <View style={styles.tlLine} />}
               </View>
               <View style={styles.tlContent}>
                 <View style={styles.tlHead}>

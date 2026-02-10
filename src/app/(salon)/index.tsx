@@ -1,8 +1,14 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect, Polyline } from 'react-native-svg';
 import { useAuthStore } from '@/stores/authStore';
+import { useGeneralCount } from '@/hooks/useReports';
+import { useSalonAnalytics } from '@/hooks/useSalon';
+import { useDashboardAppointments } from '@/hooks/useAppointments';
+import { useStylistsBySalon } from '@/hooks/useStylist';
+import { useAppointmentMetrics } from '@/hooks/useAppointments';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -51,6 +57,64 @@ const MOCK_RECENT_ACTIVITY = [
 export default function SalonDashboardScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const salonId = useAuthStore((s) => s.salonId);
+
+  // --- API hooks (only fire when NOT in demo mode) ---
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const offset = new Date().getTimezoneOffset();
+
+  const { data: generalCount, isLoading: loadingGeneral } = useGeneralCount();
+  const { data: analytics, isLoading: loadingAnalytics } = useSalonAnalytics('monthly');
+  const { data: appointmentsData, isLoading: loadingAppointments } = useDashboardAppointments(
+    { salon: salonId || '', fromDate: todayStr, toDate: todayStr, offset },
+    !isDemo && !!salonId,
+  );
+  const { data: stylistsData, isLoading: loadingStylists } = useStylistsBySalon();
+  const metrics = useAppointmentMetrics(salonId || '');
+
+  const isApiLoading = !isDemo && (loadingGeneral || loadingAnalytics || loadingAppointments || loadingStylists);
+
+  // --- Map API data to display values ---
+  const stats = useMemo(() => {
+    if (isDemo || !generalCount) return MOCK_STATS;
+    return {
+      todayRevenue: generalCount.todayRevenue ?? MOCK_STATS.todayRevenue,
+      weekRevenue: generalCount.weekRevenue ?? MOCK_STATS.weekRevenue,
+      todayAppointments: generalCount.todayAppointments ?? MOCK_STATS.todayAppointments,
+      completedToday: generalCount.completedToday ?? MOCK_STATS.completedToday,
+      cancelledToday: generalCount.cancelledToday ?? MOCK_STATS.cancelledToday,
+      activeStylists: generalCount.activeStylists ?? MOCK_STATS.activeStylists,
+      totalClients: generalCount.totalClients ?? MOCK_STATS.totalClients,
+      newClientsThisWeek: generalCount.newClientsThisWeek ?? MOCK_STATS.newClientsThisWeek,
+    };
+  }, [isDemo, generalCount]);
+
+  const upcomingAppointments = useMemo(() => {
+    if (isDemo || !appointmentsData) return MOCK_UPCOMING;
+    const list = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.appointments || [];
+    return list.slice(0, 5).map((apt: any) => ({
+      id: apt._id || apt.id,
+      client: typeof apt.user === 'object' ? apt.user?.name : 'Client',
+      service: typeof apt.mainService === 'object' ? apt.mainService?.title : (typeof apt.subService === 'object' ? apt.subService?.title : 'Service'),
+      stylist: typeof apt.stylist === 'object' ? apt.stylist?.name : 'Stylist',
+      time: apt.timeAsAString || '',
+      duration: apt.mainService?.requiredTime ? `${apt.mainService.requiredTime} min` : '60 min',
+      price: typeof apt.mainService === 'object' ? (apt.mainService?.charges ?? 0) : 0,
+    }));
+  }, [isDemo, appointmentsData]);
+
+  const staffList = useMemo(() => {
+    if (isDemo || !stylistsData) return MOCK_STYLISTS;
+    const list = Array.isArray(stylistsData) ? stylistsData : stylistsData.users || stylistsData.stylists || [];
+    return list.slice(0, 6).map((s: any) => ({
+      id: s._id || s.id,
+      name: s.name || 'Staff',
+      appointments: 0,
+      revenue: 0,
+      status: s.active !== false ? ('available' as const) : ('break' as const),
+    }));
+  }, [isDemo, stylistsData]);
 
   const greeting = getGreeting();
   const firstName = user?.name?.split(' ')[0] || 'Owner';
@@ -76,23 +140,29 @@ export default function SalonDashboardScreen() {
         {/* Quick stats row */}
         <View style={styles.quickStats}>
           <View style={styles.quickStatItem}>
-            <Text style={styles.quickStatValue}>${MOCK_STATS.todayRevenue.toLocaleString()}</Text>
+            <Text style={styles.quickStatValue}>${stats.todayRevenue.toLocaleString()}</Text>
             <Text style={styles.quickStatLabel}>Today</Text>
           </View>
           <View style={styles.quickStatDivider} />
           <View style={styles.quickStatItem}>
-            <Text style={styles.quickStatValue}>{MOCK_STATS.todayAppointments}</Text>
+            <Text style={styles.quickStatValue}>{stats.todayAppointments}</Text>
             <Text style={styles.quickStatLabel}>Appointments</Text>
           </View>
           <View style={styles.quickStatDivider} />
           <View style={styles.quickStatItem}>
-            <Text style={styles.quickStatValue}>{MOCK_STATS.activeStylists}</Text>
+            <Text style={styles.quickStatValue}>{stats.activeStylists}</Text>
             <Text style={styles.quickStatLabel}>Stylists</Text>
           </View>
         </View>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        {isApiLoading && (
+          <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+            <ActivityIndicator size="small" color={colors.gold} />
+          </View>
+        )}
+
         {/* Revenue Overview Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -107,21 +177,21 @@ export default function SalonDashboardScreen() {
           </View>
           <View style={styles.revenueRow}>
             <View>
-              <Text style={styles.revenueBig}>${MOCK_STATS.weekRevenue.toLocaleString()}</Text>
+              <Text style={styles.revenueBig}>${stats.weekRevenue.toLocaleString()}</Text>
               <Text style={styles.revenueLabel}>Weekly total</Text>
             </View>
             <View style={styles.revenueMiniStats}>
               <View style={styles.revenueMiniItem}>
                 <View style={[styles.revenueDot, { backgroundColor: colors.success }]} />
-                <Text style={styles.revenueMiniText}>{MOCK_STATS.completedToday} completed</Text>
+                <Text style={styles.revenueMiniText}>{stats.completedToday} completed</Text>
               </View>
               <View style={styles.revenueMiniItem}>
                 <View style={[styles.revenueDot, { backgroundColor: colors.error }]} />
-                <Text style={styles.revenueMiniText}>{MOCK_STATS.cancelledToday} cancelled</Text>
+                <Text style={styles.revenueMiniText}>{stats.cancelledToday} cancelled</Text>
               </View>
               <View style={styles.revenueMiniItem}>
                 <View style={[styles.revenueDot, { backgroundColor: colors.info }]} />
-                <Text style={styles.revenueMiniText}>{MOCK_STATS.newClientsThisWeek} new clients</Text>
+                <Text style={styles.revenueMiniText}>{stats.newClientsThisWeek} new clients</Text>
               </View>
             </View>
           </View>
@@ -143,7 +213,7 @@ export default function SalonDashboardScreen() {
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
           </View>
-          {MOCK_UPCOMING.map((apt) => (
+          {upcomingAppointments.map((apt) => (
             <View key={apt.id} style={styles.appointmentRow}>
               <View style={styles.appointmentTime}>
                 <Text style={styles.aptTimeText}>{apt.time}</Text>
@@ -172,7 +242,7 @@ export default function SalonDashboardScreen() {
               <Text style={styles.cardTitle}>Staff Activity</Text>
             </View>
           </View>
-          {MOCK_STYLISTS.map((stylist) => (
+          {staffList.map((stylist) => (
             <View key={stylist.id} style={styles.stylistRow}>
               <View style={styles.stylistAvatar}>
                 <Text style={styles.stylistInitial}>{stylist.name[0]}</Text>

@@ -11,12 +11,13 @@ export function useNotifications(params: { pageNumber: number; pageSize: number 
   });
 }
 
-export function useUserNotifications(params: { pageNumber: number; pageSize: number }) {
+export function useUserNotifications(params: { pageNumber: number; pageSize: number }, enabled = true) {
   return useQuery({
     queryKey: ['notifications', 'user', params],
     queryFn: async () => {
       const res = await notificationsApi.getForUser(params);
       return res.data;
     },
+    enabled,
   });
 }

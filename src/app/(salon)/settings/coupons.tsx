@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Line } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useSalonCoupons, useDeleteCoupon } from '@/hooks/useCoupons';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -35,7 +37,35 @@ const INITIAL_COUPONS: Coupon[] = [
 
 export default function CouponsScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+
+  // --- API hooks ---
+  const { data: couponsData, isLoading } = useSalonCoupons({ pageNumber: 1, pageSize: 100 });
+  const deleteCouponMutation = useDeleteCoupon();
+
+  const apiCoupons: Coupon[] = useMemo(() => {
+    if (isDemo || !couponsData) return [];
+    const list = Array.isArray(couponsData) ? couponsData : couponsData.coupons || couponsData.data || [];
+    return list.map((c: any) => {
+      const now = new Date();
+      const expiryDate = c.expiry ? new Date(c.expiry) : null;
+      const isExpired = expiryDate ? expiryDate < now : false;
+      return {
+        id: c._id || c.id,
+        code: c.code || '',
+        discount: `${c.discount || 0}% off`,
+        description: c.description || '',
+        usedCount: c.usageCount ?? 0,
+        maxUses: c.usageLimit ?? null,
+        expiry: expiryDate ? expiryDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : null,
+        expired: isExpired,
+        enabled: c.enable !== false && !isExpired,
+      };
+    });
+  }, [isDemo, couponsData]);
+
   const [coupons, setCoupons] = useState(INITIAL_COUPONS);
+  const displayCoupons = !isDemo && apiCoupons.length > 0 ? apiCoupons : coupons;
   const [showExpired, setShowExpired] = useState(true);
 
   const toggleCoupon = (id: string) => {
@@ -44,8 +74,8 @@ export default function CouponsScreen() {
     );
   };
 
-  const activeCoupons = coupons.filter((c) => !c.expired);
-  const expiredCoupons = coupons.filter((c) => c.expired);
+  const activeCoupons = displayCoupons.filter((c) => !c.expired);
+  const expiredCoupons = displayCoupons.filter((c) => c.expired);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -71,6 +101,11 @@ export default function CouponsScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        {!isDemo && isLoading && (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <ActivityIndicator size="small" color={colors.gold} />
+          </View>
+        )}
         {/* Active Coupons Section */}
         <Text style={styles.sectionTitle}>Active Coupons</Text>
         {activeCoupons.map((coupon) => (

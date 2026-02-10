@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect, Polyline } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useAuthStore } from '@/stores/authStore';
+import { useAppStore } from '@/stores/appStore';
+import { useProductDetail, useSimilarProducts } from '@/hooks/useProducts';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -46,14 +49,46 @@ export default function ProductDetail() {
   const router = useRouter();
   const [quantity, setQuantity] = useState(1);
   const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const addToCart = useAppStore((s) => s.addToCart);
 
-  const categoryColor = CATEGORY_COLORS[PRODUCT.category] || colors.navy;
-  const total = (PRODUCT.price * quantity).toFixed(2);
+  const productId = typeof id === 'string' ? id : Array.isArray(id) ? id[0] : '';
+  const { data: apiProduct, isLoading: productLoading } = useProductDetail(productId, !isDemo);
+  const { data: apiSimilar, isLoading: similarLoading } = useSimilarProducts(productId, !isDemo);
+
+  const product = !isDemo && apiProduct
+    ? {
+        id: apiProduct._id,
+        name: apiProduct.productName,
+        brand: apiProduct.category?.categoryName || 'Brand',
+        price: apiProduct.productPrice,
+        category: apiProduct.category?.categoryName || 'Treatment',
+        rating: apiProduct.rating || 4.5,
+        reviewCount: 0,
+        description: apiProduct.productDescription || '',
+        howToUse: PRODUCT.howToUse,
+        ingredients: PRODUCT.ingredients,
+      }
+    : PRODUCT;
+
+  const similarProducts = !isDemo && apiSimilar
+    ? apiSimilar.map((p: any) => ({
+        id: p._id,
+        name: p.productName,
+        brand: p.category?.categoryName || 'Brand',
+        price: p.productPrice,
+        category: p.category?.categoryName || 'Other',
+        initial: p.productName?.charAt(0) || '?',
+      }))
+    : SIMILAR_PRODUCTS;
+
+  const categoryColor = CATEGORY_COLORS[product.category] || colors.navy;
+  const total = (product.price * quantity).toFixed(2);
 
   const renderStars = () => {
     const stars = [];
-    const fullStars = Math.floor(PRODUCT.rating);
-    const hasHalf = PRODUCT.rating % 1 >= 0.3;
+    const fullStars = Math.floor(product.rating);
+    const hasHalf = product.rating % 1 >= 0.3;
     for (let i = 0; i < 5; i++) {
       const filled = i < fullStars;
       const half = i === fullStars && hasHalf;
@@ -104,7 +139,7 @@ export default function ProductDetail() {
               />
             </Svg>
             <Text style={[styles.breadcrumbText, styles.breadcrumbActive]}>
-              {PRODUCT.category}
+              {product.category}
             </Text>
           </View>
         </View>
@@ -119,40 +154,40 @@ export default function ProductDetail() {
         <View style={[styles.imagePlaceholder, { backgroundColor: categoryColor + '12' }]}>
           <View style={[styles.imageCircle, { backgroundColor: categoryColor + '20' }]}>
             <Text style={[styles.imageInitial, { color: categoryColor }]}>
-              {PRODUCT.name.charAt(0)}
+              {product.name.charAt(0)}
             </Text>
           </View>
           <View style={[styles.categoryBadge, { backgroundColor: categoryColor + '18' }]}>
             <Text style={[styles.categoryBadgeText, { color: categoryColor }]}>
-              {PRODUCT.category}
+              {product.category}
             </Text>
           </View>
         </View>
 
         {/* Product info */}
         <View style={styles.productInfo}>
-          <Text style={styles.brandName}>{PRODUCT.brand}</Text>
-          <Text style={styles.productName}>{PRODUCT.name}</Text>
-          <Text style={styles.productPrice}>${PRODUCT.price.toFixed(2)}</Text>
+          <Text style={styles.brandName}>{product.brand}</Text>
+          <Text style={styles.productName}>{product.name}</Text>
+          <Text style={styles.productPrice}>${product.price.toFixed(2)}</Text>
 
           {/* Rating */}
           <View style={styles.ratingRow}>
             <View style={styles.starsRow}>{renderStars()}</View>
-            <Text style={styles.ratingText}>{PRODUCT.rating}</Text>
-            <Text style={styles.reviewCount}>({PRODUCT.reviewCount} reviews)</Text>
+            <Text style={styles.ratingText}>{product.rating}</Text>
+            <Text style={styles.reviewCount}>({product.reviewCount} reviews)</Text>
           </View>
         </View>
 
         {/* Description card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Description</Text>
-          <Text style={styles.cardBody}>{PRODUCT.description}</Text>
+          <Text style={styles.cardBody}>{product.description}</Text>
         </View>
 
         {/* How to Use card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>How to Use</Text>
-          {PRODUCT.howToUse.map((step, index) => (
+          {product.howToUse.map((step, index) => (
             <View key={index} style={styles.stepRow}>
               <View style={styles.stepNumber}>
                 <Text style={styles.stepNumberText}>{index + 1}</Text>
@@ -181,11 +216,11 @@ export default function ProductDetail() {
             </Svg>
           </TouchableOpacity>
           {ingredientsExpanded ? (
-            <Text style={styles.cardBody}>{PRODUCT.ingredients}</Text>
+            <Text style={styles.cardBody}>{product.ingredients}</Text>
           ) : (
             <View>
               <Text style={styles.cardBody} numberOfLines={1}>
-                {PRODUCT.ingredients}
+                {product.ingredients}
               </Text>
               <Text style={styles.seeMore}>See more</Text>
             </View>
@@ -243,7 +278,12 @@ export default function ProductDetail() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.similarRow}
         >
-          {SIMILAR_PRODUCTS.map((product) => {
+          {!isDemo && similarLoading && (
+            <View style={{ paddingVertical: 20, paddingHorizontal: 40 }}>
+              <ActivityIndicator size="small" color={colors.navy} />
+            </View>
+          )}
+          {similarProducts.map((product: any) => {
             const simColor = CATEGORY_COLORS[product.category] || colors.navy;
             return (
               <TouchableOpacity
@@ -276,9 +316,22 @@ export default function ProductDetail() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
+      {!isDemo && productLoading && (
+        <View style={{ position: 'absolute', top: '50%', left: 0, right: 0, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.navy} />
+        </View>
+      )}
+
       {/* Sticky bottom: Add to Cart */}
       <View style={styles.stickyBottom}>
-        <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8} onPress={() => { Alert.alert('Added to Cart', `${quantity}x ${PRODUCT.name} added to your cart`, [{ text: 'Continue Shopping', onPress: () => router.back() }, { text: 'View Cart', onPress: () => router.push('/(customer)/shop/cart') }]); }}>
+        <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8} onPress={() => {
+          if (!isDemo) {
+            for (let i = 0; i < quantity; i++) {
+              addToCart({ productId: product.id, name: product.name, price: product.price });
+            }
+          }
+          Alert.alert('Added to Cart', `${quantity}x ${product.name} added to your cart`, [{ text: 'Continue Shopping', onPress: () => router.back() }, { text: 'View Cart', onPress: () => router.push('/(customer)/shop/cart') }]);
+        }}>
           <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
             <Rect
               x={4}

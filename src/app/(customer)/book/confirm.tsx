@@ -1,22 +1,64 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useAuthStore } from '@/stores/authStore';
+import { useCreateAppointment } from '@/hooks/useAppointments';
 
 export default function BookingConfirmation() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     serviceId: string; serviceName: string; servicePrice: string; serviceDuration: string;
     stylistId: string; stylistName: string; date: string; time: string;
+    mainServiceId: string; dateForApi: string;
   }>();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const user = useAuthStore((s) => s.user);
+  const salonId = useAuthStore((s) => s.salonId);
+  const createAppointment = useCreateAppointment();
   const [comment, setComment] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
   const handleConfirm = () => {
-    setConfirmed(true);
+    if (isDemo) {
+      setConfirmed(true);
+      return;
+    }
+
+    const offset = new Date().getTimezoneOffset() * -1;
+    const durationMinutes = parseInt(params.serviceDuration?.replace(/\D/g, '') || '30', 10);
+
+    createAppointment.mutate(
+      {
+        data: {
+          appointmentDate: params.dateForApi || '',
+          timeData: {
+            timeAsADate: '',
+            timeAsAString: params.time || '',
+            id: '',
+          },
+          salon: salonId || undefined,
+          stylistId: params.stylistId !== 'any' ? params.stylistId : undefined,
+          email: user?.email || '',
+          mobile: user?.phone || '',
+          name: user?.name || '',
+          gender: user?.gender || 'other',
+          comment,
+          mainService: params.mainServiceId || '',
+          subService: params.serviceId || '',
+          requiredDuration: durationMinutes,
+        },
+        offset,
+      },
+      {
+        onSuccess: () => setConfirmed(true),
+        onError: (error: Error) =>
+          Alert.alert('Booking Error', error.message || 'Could not create appointment. Please try again.'),
+      }
+    );
   };
 
   if (confirmed) {
@@ -172,9 +214,20 @@ export default function BookingConfirmation() {
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm} activeOpacity={0.7}>
-          <Text style={styles.confirmText}>REQUEST BOOKING</Text>
-          <Text style={styles.confirmPrice}>${params.servicePrice || '65'}</Text>
+        <TouchableOpacity
+          style={[styles.confirmButton, createAppointment.isPending && { opacity: 0.7 }]}
+          onPress={handleConfirm}
+          activeOpacity={0.7}
+          disabled={createAppointment.isPending}
+        >
+          {createAppointment.isPending ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <>
+              <Text style={styles.confirmText}>REQUEST BOOKING</Text>
+              <Text style={styles.confirmPrice}>${params.servicePrice || '65'}</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

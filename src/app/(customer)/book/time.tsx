@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useAuthStore } from '@/stores/authStore';
+import { useMobileAvailability } from '@/hooks/useAvailability';
 
 const STEPS = ['Service', 'Stylist', 'Time'];
 const ACTIVE_STEP = 2;
@@ -42,13 +44,28 @@ function generateDays(year: number, month: number) {
 
 export default function SelectTime() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ serviceId: string; serviceName: string; servicePrice: string; serviceDuration: string; stylistId: string; stylistName: string }>();
+  const params = useLocalSearchParams<{ serviceId: string; serviceName: string; servicePrice: string; serviceDuration: string; stylistId: string; stylistName: string; mainServiceId: string }>();
+  const isDemo = useAuthStore((s) => s.isDemo);
 
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDay, setSelectedDay] = useState(today.getDate());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+
+  const selectedDateForApi = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+  const { data: availabilityData, isLoading: isSlotsLoading } = useMobileAvailability(selectedDateForApi, !isDemo);
+
+  const { displayTimeSlots, displayBookedSlots } = useMemo(() => {
+    if (!isDemo && availabilityData?.timeData) {
+      const allSlots = availabilityData.timeData.map((t: { timeAsAString: string }) => t.timeAsAString);
+      const booked = availabilityData.timeData
+        .filter((t: { isAvailable: boolean }) => !t.isAvailable)
+        .map((t: { timeAsAString: string }) => t.timeAsAString);
+      return { displayTimeSlots: allSlots, displayBookedSlots: booked };
+    }
+    return { displayTimeSlots: TIME_SLOTS, displayBookedSlots: BOOKED_SLOTS };
+  }, [isDemo, availabilityData]);
 
   const days = useMemo(() => generateDays(currentYear, currentMonth), [currentYear, currentMonth]);
   const isToday = (day: number) => day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
@@ -146,9 +163,14 @@ export default function SelectTime() {
 
         {/* Time Slots */}
         <Text style={styles.sectionTitle}>Available Times</Text>
+        {isSlotsLoading && !isDemo && (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <ActivityIndicator size="large" color={colors.gold} />
+          </View>
+        )}
         <View style={styles.slotsGrid}>
-          {TIME_SLOTS.map((slot) => {
-            const booked = BOOKED_SLOTS.includes(slot);
+          {displayTimeSlots.map((slot) => {
+            const booked = displayBookedSlots.includes(slot);
             const selected = selectedTime === slot;
             return (
               <TouchableOpacity
@@ -185,6 +207,7 @@ export default function SelectTime() {
                 ...params,
                 date: `${selectedDay} ${MONTH_NAMES[currentMonth].slice(0, 3)} ${currentYear}`,
                 time: selectedTime!,
+                dateForApi: selectedDateForApi,
               },
             });
           }}

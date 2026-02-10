@@ -1,8 +1,12 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useAppointmentsByStylist } from '@/hooks/useAppointments';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import type { Appointment as ApiAppointment } from '@/api/types';
 
 type Client = {
   id: string;
@@ -98,16 +102,97 @@ const MOCK_CLIENTS: Client[] = [
   },
 ];
 
+const ACCENT_COLORS = ['#7c3aed', '#0891b2', '#c026d3', '#059669', '#d97706', '#dc2626', '#2563eb', '#0d9488'];
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function buildClientsFromAppointments(appointments: ApiAppointment[]): Client[] {
+  const clientMap = new Map<string, { name: string; visitCount: number; lastVisit: string; nextVisit: string | null }>();
+
+  for (const apt of appointments) {
+    const userId = typeof apt.user === 'object' ? (apt.user as any)?._id : apt.user;
+    const userName = apt.userName || (typeof apt.user === 'object' ? (apt.user as any)?.name : '') || 'Client';
+    if (!userId) continue;
+
+    const existing = clientMap.get(userId);
+    const dateStr = apt.dateAsAString || apt.createdAt || '';
+
+    if (existing) {
+      existing.visitCount += 1;
+      // Keep most recent as last visit
+      if (dateStr > existing.lastVisit) {
+        existing.lastVisit = dateStr;
+      }
+    } else {
+      clientMap.set(userId, {
+        name: userName,
+        visitCount: 1,
+        lastVisit: dateStr,
+        nextVisit: null,
+      });
+    }
+  }
+
+  // Convert to Client array
+  let idx = 0;
+  const clients: Client[] = [];
+  for (const [id, info] of clientMap) {
+    const formattedDate = info.lastVisit
+      ? new Date(info.lastVisit).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '';
+    clients.push({
+      id,
+      name: info.name,
+      initials: getInitials(info.name),
+      lastVisit: formattedDate,
+      nextVisit: info.nextVisit,
+      notes: '',
+      visitCount: info.visitCount,
+      accentColor: ACCENT_COLORS[idx % ACCENT_COLORS.length],
+    });
+    idx++;
+  }
+
+  // Sort by visit count descending
+  clients.sort((a, b) => b.visitCount - a.visitCount);
+  return clients;
+}
+
 export default function ClientNotesScreen() {
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const stylistId = useAuthStore((s) => s.stylistId);
+
+  const { data: apiData, isLoading } = useAppointmentsByStylist(
+    { pageNumber: 1, pageSize: 200, stylistId: stylistId || undefined },
+    !isDemo && !!stylistId,
+  );
+
+  const clients = useMemo(() => {
+    if (isDemo || !apiData?.result) return MOCK_CLIENTS;
+    const derived = buildClientsFromAppointments(apiData.result);
+    return derived.length > 0 ? derived : MOCK_CLIENTS;
+  }, [isDemo, apiData]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Client Notes</Text>
-        <Text style={styles.subtitle}>{MOCK_CLIENTS.length} clients with notes</Text>
+        <Text style={styles.subtitle}>{clients.length} clients with notes</Text>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        {MOCK_CLIENTS.map((client) => (
+        {!isDemo && isLoading && (
+          <ActivityIndicator size="small" color={colors.gold} style={{ marginVertical: 12 }} />
+        )}
+
+        {clients.map((client) => (
           <View key={client.id} style={styles.clientCard}>
             <View style={styles.clientTop}>
               {/* Avatar */}

@@ -1,9 +1,64 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useAppointmentDetail, useDeleteAppointment, useChangeAppointmentStatus } from '@/hooks/useAppointments';
+import { User, Service } from '@/api/types';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+
+function getUserName(ref: string | User | undefined): string {
+  if (!ref) return '';
+  if (typeof ref === 'string') return '';
+  return ref.name || '';
+}
+
+function getServiceTitle(ref: string | Service | undefined): string {
+  if (!ref) return '';
+  if (typeof ref === 'string') return '';
+  return (ref as Service).title || '';
+}
+
+function getServiceCharges(ref: string | Service | undefined): number {
+  if (!ref || typeof ref === 'string') return 0;
+  return (ref as Service).charges || 0;
+}
+
+function getUserAddress(ref: string | User | undefined): string {
+  if (!ref || typeof ref === 'string') return '';
+  return (ref as User).address || '';
+}
+
+function getUserPhone(ref: string | User | undefined): string {
+  if (!ref || typeof ref === 'string') return '';
+  return (ref as User).phone || '';
+}
+
+function getInitials(name: string): string {
+  if (!name) return '';
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}min`;
+  if (h > 0) return `${h}h`;
+  return `${m}min`;
+}
+
+function mapApiStatus(status: string): 'Confirmed' | 'Pending' | 'Cancelled' {
+  switch (status) {
+    case 'confirmed':
+    case 'completed':
+      return 'Confirmed';
+    case 'canceled':
+      return 'Cancelled';
+    default:
+      return 'Pending';
+  }
+}
 
 const APPOINTMENT = {
   id: 'appt-001',
@@ -38,13 +93,44 @@ const STATUS_CONFIG = {
 export default function AppointmentDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const appointmentId = (id as string) || '';
+  const { data: appointmentData, isLoading } = useAppointmentDetail(appointmentId, !isDemo);
+  const deleteAppointmentMutation = useDeleteAppointment();
+  const changeStatusMutation = useChangeAppointmentStatus();
 
-  const statusStyle = STATUS_CONFIG[APPOINTMENT.status];
+  const appointment = !isDemo && appointmentData
+    ? {
+        id: appointmentData._id,
+        status: mapApiStatus(appointmentData.status),
+        service: {
+          name: getServiceTitle(appointmentData.subService) || getServiceTitle(appointmentData.mainService) || 'Service',
+          duration: appointmentData.requiredDuration ? formatDuration(appointmentData.requiredDuration) : '',
+          price: getServiceCharges(appointmentData.subService) || getServiceCharges(appointmentData.mainService) || 0,
+        },
+        stylist: {
+          name: getUserName(appointmentData.stylist) || 'Stylist',
+          initials: getInitials(getUserName(appointmentData.stylist)) || '--',
+          specialty: '',
+        },
+        date: appointmentData.dateAsAString || '',
+        time: appointmentData.timeAsAString || '',
+        salon: {
+          name: getUserName(appointmentData.salon) || '',
+          address: getUserAddress(appointmentData.salon),
+          city: '',
+          phone: getUserPhone(appointmentData.salon),
+        },
+        notes: appointmentData.comment || '',
+      }
+    : APPOINTMENT;
+
+  const statusStyle = STATUS_CONFIG[appointment.status];
 
   const handleReschedule = () => {
     Alert.alert(
       'Reschedule Appointment',
-      `To reschedule, please call the salon directly at ${APPOINTMENT.salon.phone}.`,
+      `To reschedule, please call the salon directly at ${appointment.salon.phone}.`,
       [{ text: 'OK', style: 'default' }],
     );
   };
@@ -58,7 +144,16 @@ export default function AppointmentDetail() {
         {
           text: 'Yes, Cancel',
           style: 'destructive',
-          onPress: () => router.back(),
+          onPress: async () => {
+            if (!isDemo && appointmentId) {
+              try {
+                await deleteAppointmentMutation.mutateAsync(appointmentId);
+              } catch {
+                // Deletion failed silently, still navigate back
+              }
+            }
+            router.back();
+          },
         },
       ],
     );
@@ -89,6 +184,12 @@ export default function AppointmentDetail() {
         </View>
       </View>
 
+      {isLoading && !isDemo ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.gold} />
+        </View>
+      ) : (
+      <>
       <ScrollView
         style={styles.body}
         contentContainerStyle={styles.bodyContent}
@@ -102,7 +203,7 @@ export default function AppointmentDetail() {
               {statusStyle.label}
             </Text>
           </View>
-          <Text style={styles.appointmentId}>#{id || APPOINTMENT.id}</Text>
+          <Text style={styles.appointmentId}>#{id || appointment.id}</Text>
         </View>
 
         {/* Service card */}
@@ -120,7 +221,7 @@ export default function AppointmentDetail() {
             </Svg>
             <Text style={styles.cardLabel}>Service</Text>
           </View>
-          <Text style={styles.serviceName}>{APPOINTMENT.service.name}</Text>
+          <Text style={styles.serviceName}>{appointment.service.name}</Text>
           <View style={styles.serviceDetailsRow}>
             <View style={styles.serviceDetail}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -133,10 +234,10 @@ export default function AppointmentDetail() {
                   strokeLinejoin="round"
                 />
               </Svg>
-              <Text style={styles.serviceDetailText}>{APPOINTMENT.service.duration}</Text>
+              <Text style={styles.serviceDetailText}>{appointment.service.duration}</Text>
             </View>
             <View style={styles.serviceDetailDot} />
-            <Text style={styles.servicePrice}>${APPOINTMENT.service.price.toFixed(2)}</Text>
+            <Text style={styles.servicePrice}>${appointment.service.price.toFixed(2)}</Text>
           </View>
         </View>
 
@@ -157,11 +258,11 @@ export default function AppointmentDetail() {
           </View>
           <View style={styles.stylistRow}>
             <View style={styles.stylistAvatar}>
-              <Text style={styles.stylistInitials}>{APPOINTMENT.stylist.initials}</Text>
+              <Text style={styles.stylistInitials}>{appointment.stylist.initials}</Text>
             </View>
             <View style={styles.stylistInfo}>
-              <Text style={styles.stylistName}>{APPOINTMENT.stylist.name}</Text>
-              <Text style={styles.stylistSpecialty}>{APPOINTMENT.stylist.specialty}</Text>
+              <Text style={styles.stylistName}>{appointment.stylist.name}</Text>
+              <Text style={styles.stylistSpecialty}>{appointment.stylist.specialty}</Text>
             </View>
           </View>
         </View>
@@ -178,8 +279,8 @@ export default function AppointmentDetail() {
             <Text style={styles.cardLabel}>Date & Time</Text>
           </View>
           <View style={styles.dateTimeContent}>
-            <Text style={styles.dateText}>{APPOINTMENT.date}</Text>
-            <Text style={styles.timeText}>{APPOINTMENT.time}</Text>
+            <Text style={styles.dateText}>{appointment.date}</Text>
+            <Text style={styles.timeText}>{appointment.time}</Text>
           </View>
         </View>
 
@@ -199,9 +300,9 @@ export default function AppointmentDetail() {
             <Text style={styles.cardLabel}>Location</Text>
           </View>
           <View style={styles.locationContent}>
-            <Text style={styles.salonName}>{APPOINTMENT.salon.name}</Text>
-            <Text style={styles.salonAddress}>{APPOINTMENT.salon.address}</Text>
-            <Text style={styles.salonAddress}>{APPOINTMENT.salon.city}</Text>
+            <Text style={styles.salonName}>{appointment.salon.name}</Text>
+            <Text style={styles.salonAddress}>{appointment.salon.address}</Text>
+            <Text style={styles.salonAddress}>{appointment.salon.city}</Text>
             <View style={styles.phoneRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Path
@@ -212,7 +313,7 @@ export default function AppointmentDetail() {
                   strokeLinejoin="round"
                 />
               </Svg>
-              <Text style={styles.phoneText}>{APPOINTMENT.salon.phone}</Text>
+              <Text style={styles.phoneText}>{appointment.salon.phone}</Text>
             </View>
           </View>
         </View>
@@ -238,7 +339,7 @@ export default function AppointmentDetail() {
             </Svg>
             <Text style={styles.cardLabel}>Notes</Text>
           </View>
-          <Text style={styles.notesText}>{APPOINTMENT.notes}</Text>
+          <Text style={styles.notesText}>{appointment.notes}</Text>
         </View>
 
         {/* Bottom spacing for sticky buttons */}
@@ -275,6 +376,8 @@ export default function AppointmentDetail() {
           </TouchableOpacity>
         </View>
       </View>
+      </>
+      )}
     </SafeAreaView>
   );
 }

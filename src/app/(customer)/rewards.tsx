@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Line, Rect, Polyline } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useRewardInfo } from '@/hooks/useAuth';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -103,9 +105,26 @@ function EarnIcon({ icon, size = 18 }: { icon: string; size?: number }) {
 }
 
 export default function RewardsScreen() {
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const user = useAuthStore((s) => s.user);
+  const { data: rewardInfo, isLoading } = useRewardInfo(!isDemo);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  const tierProgress = COIN_BALANCE / NEXT_TIER_THRESHOLD;
+  const coinBalance = !isDemo && rewardInfo ? rewardInfo.coins : COIN_BALANCE;
+
+  const transactions = !isDemo && rewardInfo?.coinsHistory?.length
+    ? rewardInfo.coinsHistory.map((tx) => ({
+        id: tx._id,
+        amount: tx.coin || tx.amount,
+        type: (tx.transactionType === 'added' ? 'earned' : 'spent') as 'earned' | 'spent',
+        description: tx.description,
+        date: new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      }))
+    : TRANSACTIONS;
+
+  const referralCode = !isDemo && user?.referralCode ? user.referralCode : REFERRAL_CODE;
+
+  const tierProgress = coinBalance / NEXT_TIER_THRESHOLD;
   const progressPercent = Math.min(tierProgress * 100, 100);
 
   const handleCopy = () => {
@@ -123,18 +142,24 @@ export default function RewardsScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Rewards</Text>
         <View style={styles.coinDisplay}>
-          {/* Coin icon */}
-          <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
-            <Circle cx={12} cy={12} r={10} stroke={colors.gold} strokeWidth={1.5} />
-            <Circle cx={12} cy={12} r={6.5} stroke={colors.gold} strokeWidth={1} />
-            <Path
-              d="M12 8v8M9.5 10.5c0-.83.67-1.5 1.5-1.5h1c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-1c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5h1c.83 0 1.5-.67 1.5-1.5"
-              stroke={colors.gold}
-              strokeWidth={1}
-              strokeLinecap="round"
-            />
-          </Svg>
-          <Text style={styles.coinAmount}>{COIN_BALANCE} coins</Text>
+          {isLoading && !isDemo ? (
+            <ActivityIndicator size="small" color={colors.gold} />
+          ) : (
+            <>
+              {/* Coin icon */}
+              <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
+                <Circle cx={12} cy={12} r={10} stroke={colors.gold} strokeWidth={1.5} />
+                <Circle cx={12} cy={12} r={6.5} stroke={colors.gold} strokeWidth={1} />
+                <Path
+                  d="M12 8v8M9.5 10.5c0-.83.67-1.5 1.5-1.5h1c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-1c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5h1c.83 0 1.5-.67 1.5-1.5"
+                  stroke={colors.gold}
+                  strokeWidth={1}
+                  strokeLinecap="round"
+                />
+              </Svg>
+              <Text style={styles.coinAmount}>{coinBalance} coins</Text>
+            </>
+          )}
         </View>
       </View>
 
@@ -161,7 +186,7 @@ export default function RewardsScreen() {
               <Text style={styles.tierName}>{CURRENT_TIER} Member</Text>
             </View>
             <Text style={styles.tierSubtext}>
-              {NEXT_TIER_THRESHOLD - COIN_BALANCE} coins to {NEXT_TIER}
+              {Math.max(NEXT_TIER_THRESHOLD - coinBalance, 0)} coins to {NEXT_TIER}
             </Text>
           </View>
 
@@ -170,14 +195,14 @@ export default function RewardsScreen() {
             <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
           </View>
           <View style={styles.progressLabels}>
-            <Text style={styles.progressLabelLeft}>{COIN_BALANCE}</Text>
+            <Text style={styles.progressLabelLeft}>{coinBalance}</Text>
             <Text style={styles.progressLabelRight}>{NEXT_TIER_THRESHOLD}</Text>
           </View>
 
           {/* Tier markers */}
           <View style={styles.tierMarkers}>
             {TIERS.map((tier, index) => {
-              const isActive = COIN_BALANCE >= tier.threshold;
+              const isActive = coinBalance >= tier.threshold;
               return (
                 <View key={tier.name} style={styles.tierMarker}>
                   <View
@@ -230,7 +255,7 @@ export default function RewardsScreen() {
             <Text style={styles.cardTitle}>Redeem Rewards</Text>
           </View>
           {REDEEM_REWARDS.map((reward, index) => {
-            const canRedeem = COIN_BALANCE >= reward.coins;
+            const canRedeem = coinBalance >= reward.coins;
             return (
               <View
                 key={reward.id}
@@ -279,7 +304,7 @@ export default function RewardsScreen() {
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Transaction History</Text>
           </View>
-          {TRANSACTIONS.map((tx, index) => (
+          {transactions.map((tx, index) => (
             <View
               key={tx.id}
               style={[styles.txRow, index > 0 && styles.rowBorder]}
@@ -339,7 +364,7 @@ export default function RewardsScreen() {
             </Text>
             <View style={styles.referralCodeRow}>
               <View style={styles.referralCodeBox}>
-                <Text style={styles.referralCode}>{REFERRAL_CODE}</Text>
+                <Text style={styles.referralCode}>{referralCode}</Text>
               </View>
               <TouchableOpacity
                 style={[styles.copyButton, copiedCode && styles.copyButtonCopied]}

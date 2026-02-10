@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Line } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useServiceGroups, useDeleteService } from '@/hooks/useServices';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -49,7 +51,53 @@ function formatDuration(mins: number): string {
 
 export default function ServicesScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+
+  // --- API hooks ---
+  const { data: serviceGroupsData, isLoading } = useServiceGroups();
+  const deleteServiceMutation = useDeleteService();
+
+  const apiServices: Service[] = useMemo(() => {
+    if (isDemo || !serviceGroupsData) return [];
+    const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : [];
+    const flat: Service[] = [];
+    groups.forEach((group: any) => {
+      const mainSvc = group.mainService;
+      if (mainSvc) {
+        flat.push({
+          id: mainSvc._id,
+          name: mainSvc.title || 'Service',
+          price: mainSvc.charges || 0,
+          duration: mainSvc.requiredTime || 30,
+          category: (mainSvc.title || '').toLowerCase().includes('color') ? 'Color'
+            : (mainSvc.title || '').toLowerCase().includes('treat') ? 'Treatment'
+            : (mainSvc.title || '').toLowerCase().includes('styl') ? 'Styling'
+            : 'Hair',
+          enabled: mainSvc.enable !== false,
+        });
+      }
+      const subs = group.subServices || [];
+      subs.forEach((sub: any) => {
+        flat.push({
+          id: sub._id,
+          name: sub.title || 'Sub-service',
+          price: sub.charges || 0,
+          duration: sub.requiredTime || 30,
+          category: mainSvc?.title ? (
+            (mainSvc.title || '').toLowerCase().includes('color') ? 'Color'
+            : (mainSvc.title || '').toLowerCase().includes('treat') ? 'Treatment'
+            : (mainSvc.title || '').toLowerCase().includes('styl') ? 'Styling'
+            : 'Hair'
+          ) : 'Hair',
+          enabled: sub.enable !== false,
+        });
+      });
+    });
+    return flat;
+  }, [isDemo, serviceGroupsData]);
+
   const [services, setServices] = useState(INITIAL_SERVICES);
+  const displayServices = !isDemo && apiServices.length > 0 ? apiServices : services;
   const [activeCategory, setActiveCategory] = useState<Category>('All');
 
   const toggleService = (id: string) => {
@@ -59,8 +107,8 @@ export default function ServicesScreen() {
   };
 
   const filtered = activeCategory === 'All'
-    ? services
-    : services.filter((s) => s.category === activeCategory);
+    ? displayServices
+    : displayServices.filter((s) => s.category === activeCategory);
 
   // Group by category for display
   const grouped = filtered.reduce<Record<string, Service[]>>((acc, svc) => {
@@ -83,7 +131,7 @@ export default function ServicesScreen() {
             <View style={styles.headerTitleRow}>
               <Text style={styles.title}>Services</Text>
               <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{services.length} services</Text>
+                <Text style={styles.countBadgeText}>{displayServices.length} services</Text>
               </View>
             </View>
             <Text style={styles.subtitle}>Manage your service offerings</Text>
@@ -114,6 +162,11 @@ export default function ServicesScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        {!isDemo && isLoading && (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <ActivityIndicator size="small" color={colors.gold} />
+          </View>
+        )}
         {Object.entries(grouped).map(([category, items]) => (
           <View key={category}>
             {activeCategory === 'All' && (

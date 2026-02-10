@@ -1,7 +1,11 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useOrdersBySalon } from '@/hooks/useProducts';
+import { useEarningsByMonth } from '@/hooks/useReports';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -52,6 +56,37 @@ const METHOD_CONFIG: Record<PaymentMethod, { bg: string; text: string; label: st
 
 export default function PointOfSaleScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+
+  // --- API hooks ---
+  const { data: ordersData, isLoading: loadingOrders } = useOrdersBySalon({ pageNumber: 1, pageSize: 50 });
+  const { data: earningsData } = useEarningsByMonth({ offset: new Date().getTimezoneOffset() });
+
+  const apiTransactions: Transaction[] = useMemo(() => {
+    if (isDemo || !ordersData) return [];
+    const list = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
+    return list.map((o: any) => ({
+      id: o._id || o.id || o.orderId,
+      client: typeof o.user === 'object' ? o.user?.name : 'Client',
+      service: Array.isArray(o.items) && o.items.length > 0
+        ? (typeof o.items[0].product === 'object' ? o.items[0].product.productName : 'Order')
+        : 'Order',
+      amount: o.totalAmount ?? 0,
+      method: (o.paymentMethod || 'card') as PaymentMethod,
+      time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '',
+      stylist: typeof o.stylist === 'object' ? o.stylist?.name : '',
+    }));
+  }, [isDemo, ordersData]);
+
+  const displayTransactions = !isDemo && apiTransactions.length > 0 ? apiTransactions : MOCK_TRANSACTIONS;
+
+  const displayTodayTotal = displayTransactions.reduce((sum, t) => sum + t.amount, 0);
+  const displayCardTotal = displayTransactions.filter((t) => t.method === 'card').reduce((sum, t) => sum + t.amount, 0);
+  const displayCashTotal = displayTransactions.filter((t) => t.method === 'cash').reduce((sum, t) => sum + t.amount, 0);
+  const displayApplePayTotal = displayTransactions.filter((t) => t.method === 'apple-pay').reduce((sum, t) => sum + t.amount, 0);
+  const displayCardCount = displayTransactions.filter((t) => t.method === 'card').length;
+  const displayCashCount = displayTransactions.filter((t) => t.method === 'cash').length;
+  const displayApplePayCount = displayTransactions.filter((t) => t.method === 'apple-pay').length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -60,7 +95,7 @@ export default function PointOfSaleScreen() {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.title}>Point of Sale</Text>
-            <Text style={styles.subtitle}>Today's transactions {'\u00B7'} {MOCK_TRANSACTIONS.length} payments</Text>
+            <Text style={styles.subtitle}>Today's transactions {'\u00B7'} {displayTransactions.length} payments</Text>
           </View>
           <TouchableOpacity style={styles.newOrderButton} activeOpacity={0.7} onPress={() => router.push('/(salon)/pos/create')}>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
@@ -72,6 +107,12 @@ export default function PointOfSaleScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        {!isDemo && loadingOrders && (
+          <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+            <ActivityIndicator size="small" color={colors.gold} />
+          </View>
+        )}
+
         {/* Summary cards */}
         <View style={styles.summaryRow}>
           {/* Total */}
@@ -82,7 +123,7 @@ export default function PointOfSaleScreen() {
                 <Path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke={colors.textWhite} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </View>
-            <Text style={styles.summaryValueMain}>${todayTotal.toLocaleString()}</Text>
+            <Text style={styles.summaryValueMain}>${displayTodayTotal.toLocaleString()}</Text>
             <Text style={styles.summaryLabelMain}>Total today</Text>
           </View>
         </View>
@@ -95,9 +136,9 @@ export default function PointOfSaleScreen() {
                 <Rect x={1} y={4} width={22} height={16} rx={2} stroke={colors.infoDark} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
                 <Line x1={1} y1={10} x2={23} y2={10} stroke={colors.infoDark} strokeWidth={1.6} strokeLinecap="round" />
               </Svg>
-              <Text style={styles.breakdownCount}>{cardCount} txns</Text>
+              <Text style={styles.breakdownCount}>{displayCardCount} txns</Text>
             </View>
-            <Text style={styles.breakdownValue}>${cardTotal.toLocaleString()}</Text>
+            <Text style={styles.breakdownValue}>${displayCardTotal.toLocaleString()}</Text>
             <Text style={styles.breakdownLabel}>Card</Text>
           </View>
 
@@ -108,9 +149,9 @@ export default function PointOfSaleScreen() {
                 <Rect x={2} y={6} width={20} height={12} rx={2} stroke={colors.successDark} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
                 <Circle cx={12} cy={12} r={3} stroke={colors.successDark} strokeWidth={1.6} />
               </Svg>
-              <Text style={styles.breakdownCount}>{cashCount} txns</Text>
+              <Text style={styles.breakdownCount}>{displayCashCount} txns</Text>
             </View>
-            <Text style={styles.breakdownValue}>${cashTotal.toLocaleString()}</Text>
+            <Text style={styles.breakdownValue}>${displayCashTotal.toLocaleString()}</Text>
             <Text style={styles.breakdownLabel}>Cash</Text>
           </View>
 
@@ -122,9 +163,9 @@ export default function PointOfSaleScreen() {
                 <Path d="M2 17l10 5 10-5" stroke="#7c3aed" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
                 <Path d="M2 12l10 5 10-5" stroke="#7c3aed" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
-              <Text style={styles.breakdownCount}>{applePayCount} txns</Text>
+              <Text style={styles.breakdownCount}>{displayApplePayCount} txns</Text>
             </View>
-            <Text style={styles.breakdownValue}>${applePayTotal.toLocaleString()}</Text>
+            <Text style={styles.breakdownValue}>${displayApplePayTotal.toLocaleString()}</Text>
             <Text style={styles.breakdownLabel}>Apple Pay</Text>
           </View>
         </View>
@@ -141,7 +182,7 @@ export default function PointOfSaleScreen() {
             </View>
           </View>
 
-          {MOCK_TRANSACTIONS.map((txn) => {
+          {displayTransactions.map((txn) => {
             const methodCfg = METHOD_CONFIG[txn.method];
             return (
               <View key={txn.id} style={styles.txnRow}>

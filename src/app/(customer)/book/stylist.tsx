@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useAuthStore } from '@/stores/authStore';
+import { useEnabledStylists } from '@/hooks/useStylist';
 
 const STEPS = ['Service', 'Stylist', 'Time'];
 const ACTIVE_STEP = 1;
@@ -18,10 +20,31 @@ const MOCK_STYLISTS = [
 
 export default function SelectStylist() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ serviceId: string; serviceName: string; servicePrice: string; serviceDuration: string }>();
+  const params = useLocalSearchParams<{ serviceId: string; serviceName: string; servicePrice: string; serviceDuration: string; mainServiceId: string }>();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const { data: stylistsData, isLoading } = useEnabledStylists();
   const [selectedStylist, setSelectedStylist] = useState<string | null>(null);
 
-  const selected = MOCK_STYLISTS.find((s) => s.id === selectedStylist);
+  const displayStylists = useMemo(() => {
+    if (!isDemo && stylistsData) {
+      return stylistsData.map((user) => ({
+        id: user._id,
+        name: user.name,
+        initials: user.name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2),
+        role: 'Stylist',
+        specialty: user.description || '',
+        rating: 4.8,
+        reviews: 0,
+        nextAvailable: '',
+        appointments: 0,
+        color: colors.navy,
+        photo: user.photo,
+      }));
+    }
+    return MOCK_STYLISTS.map((s) => ({ ...s, photo: '' }));
+  }, [isDemo, stylistsData]);
+
+  const selected = displayStylists.find((s) => s.id === selectedStylist);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -94,7 +117,12 @@ export default function SelectStylist() {
           </View>
         </TouchableOpacity>
 
-        {MOCK_STYLISTS.map((stylist) => (
+        {isLoading && !isDemo && (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <ActivityIndicator size="large" color={colors.gold} />
+          </View>
+        )}
+        {displayStylists.map((stylist) => (
           <TouchableOpacity
             key={stylist.id}
             style={[styles.stylistCard, selectedStylist === stylist.id && styles.stylistCardSelected]}

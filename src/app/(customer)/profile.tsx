@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path, Circle, Line, Rect, Polyline } from 'react-native-svg';
 import { useAuthStore } from '@/stores/authStore';
+import { useLogout, useRewardInfo } from '@/hooks/useAuth';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -12,8 +13,13 @@ export default function Profile() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const { logout, isDemo } = useAuthStore();
+  const logoutMutation = useLogout();
+  const { data: rewardInfo } = useRewardInfo(!isDemo);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [remindersEnabled, setRemindersEnabled] = useState(true);
+
+  const coinsBalance = !isDemo && rewardInfo ? rewardInfo.coins : (user?.coins ?? 100);
+  const referralCode = !isDemo && user?.referralCode ? user.referralCode : 'DEMO2024';
 
   const initials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -21,9 +27,13 @@ export default function Profile() {
 
   const handleLogout = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await logout();
+    if (!isDemo) {
+      await logoutMutation.mutateAsync();
+    } else {
+      await logout();
+    }
     router.replace('/(auth)/login');
-  }, [logout, router]);
+  }, [isDemo, logoutMutation, logout, router]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -147,13 +157,13 @@ export default function Profile() {
             <View style={styles.rewardsRow}>
               <Text style={styles.rewardsLabel}>Coins Balance</Text>
               <View style={styles.coinsBadge}>
-                <Text style={styles.coinsValue}>{user?.coins ?? 100} coins</Text>
+                <Text style={styles.coinsValue}>{coinsBalance} coins</Text>
               </View>
             </View>
             <View style={[styles.rewardsRow, styles.rewardsRowLast]}>
               <Text style={styles.rewardsLabel}>Referral Code</Text>
               <View style={styles.referralBadge}>
-                <Text style={styles.referralCode}>DEMO2024</Text>
+                <Text style={styles.referralCode}>{referralCode}</Text>
               </View>
             </View>
           </View>

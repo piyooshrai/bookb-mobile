@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Line, Polyline } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useProductsBySalon, useProductCategories } from '@/hooks/useProducts';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -44,7 +46,35 @@ function stockStatusColor(stock: number): string {
 
 export default function ProductsScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+
+  // --- API hooks ---
+  const { data: productsData, isLoading } = useProductsBySalon({ pageNumber: 1, pageSize: 100 });
+  const { data: categoriesData } = useProductCategories();
+
+  const apiProducts: Product[] = useMemo(() => {
+    if (isDemo || !productsData) return [];
+    const list = Array.isArray(productsData) ? productsData : productsData.products || productsData.data || [];
+    return list.map((p: any) => ({
+      id: p._id || p.id,
+      name: p.productName || p.name || 'Product',
+      price: p.productPrice ?? p.price ?? 0,
+      category: (typeof p.category === 'object' ? p.category?.name : p.category) || 'Shampoo',
+      stock: p.stock ?? 0,
+      enabled: p.enable !== false,
+    }));
+  }, [isDemo, productsData]);
+
+  const apiFilterCategories: ProductCategory[] = useMemo(() => {
+    if (isDemo || !categoriesData) return FILTER_CATEGORIES;
+    const cats = Array.isArray(categoriesData) ? categoriesData : [];
+    const names: ProductCategory[] = ['All' as ProductCategory, ...cats.map((c: any) => (c.name || c.title || 'Other') as ProductCategory)];
+    return names.length > 1 ? names : FILTER_CATEGORIES;
+  }, [isDemo, categoriesData]);
+
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const displayProducts = !isDemo && apiProducts.length > 0 ? apiProducts : products;
+  const displayCategories = !isDemo && apiFilterCategories.length > 1 ? apiFilterCategories : FILTER_CATEGORIES;
   const [activeFilter, setActiveFilter] = useState<ProductCategory>('All');
 
   const toggleProduct = (id: string) => {
@@ -54,8 +84,8 @@ export default function ProductsScreen() {
   };
 
   const filtered = activeFilter === 'All'
-    ? products
-    : products.filter((p) => p.category === activeFilter);
+    ? displayProducts
+    : displayProducts.filter((p) => p.category === activeFilter);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -71,7 +101,7 @@ export default function ProductsScreen() {
             <View style={styles.headerTitleRow}>
               <Text style={styles.title}>Products</Text>
               <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{products.length} items</Text>
+                <Text style={styles.countBadgeText}>{displayProducts.length} items</Text>
               </View>
             </View>
             <Text style={styles.subtitle}>Manage your product inventory</Text>
@@ -88,7 +118,7 @@ export default function ProductsScreen() {
       {/* Filter Pills */}
       <View style={styles.filtersContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContent}>
-          {FILTER_CATEGORIES.map((cat) => (
+          {displayCategories.map((cat) => (
             <TouchableOpacity
               key={cat}
               style={[styles.filterPill, activeFilter === cat && styles.filterPillActive]}
@@ -102,6 +132,11 @@ export default function ProductsScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        {!isDemo && isLoading && (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <ActivityIndicator size="small" color={colors.gold} />
+          </View>
+        )}
         {filtered.map((product) => (
           <View key={product.id} style={[styles.card, !product.enabled && styles.cardDisabled]}>
             <View style={styles.cardContent}>

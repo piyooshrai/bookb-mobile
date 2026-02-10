@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { authApi } from '@/api/auth';
+import { useQueryClient } from '@tanstack/react-query';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -18,6 +21,10 @@ const ROLES = ['Senior Stylist', 'Stylist', 'Junior Stylist', 'Manager'] as cons
 
 export default function AddStaffScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const salonId = useAuthStore((s) => s.salonId);
+  const queryClient = useQueryClient();
+  const [isSaving, setIsSaving] = useState(false);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -27,10 +34,40 @@ export default function AddStaffScreen() {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
 
-  const handleSave = () => {
-    Alert.alert('Success', 'Staff member added', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+  const handleSave = async () => {
+    if (isDemo) {
+      Alert.alert('Success', 'Staff member added', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+      return;
+    }
+
+    if (!name.trim() || !email.trim()) {
+      Alert.alert('Validation', 'Please fill in name and email');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await authApi.createOrUpdateUser({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        role: 'stylist',
+        salon: salonId,
+        description: specialty.trim() || role,
+        startTime: startTime || '09:00',
+        endTime: endTime || '18:00',
+      });
+      queryClient.invalidateQueries({ queryKey: ['stylists'] });
+      Alert.alert('Success', 'Staff member added', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to add staff member');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -155,8 +192,12 @@ export default function AddStaffScreen() {
 
       {/* Save Button */}
       <View style={styles.saveButtonContainer}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8}>
-          <Text style={styles.saveButtonText}>SAVE STAFF MEMBER</Text>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8} disabled={isSaving}>
+          {isSaving ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.saveButtonText}>SAVE STAFF MEMBER</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

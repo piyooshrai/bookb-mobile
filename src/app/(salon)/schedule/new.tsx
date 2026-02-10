@@ -1,8 +1,12 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useCreateAppointment } from '@/hooks/useAppointments';
+import { useServiceGroups } from '@/hooks/useServices';
+import { useStylistsBySalon } from '@/hooks/useStylist';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -86,6 +90,57 @@ const UNAVAILABLE_SLOTS = ['10:00 AM', '10:30 AM', '1:00 PM', '3:30 PM', '5:30 P
 
 export default function NewAppointmentScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const salonId = useAuthStore((s) => s.salonId);
+
+  const createAppointmentMutation = useCreateAppointment();
+  const { data: serviceGroupsData } = useServiceGroups();
+  const { data: stylistsData } = useStylistsBySalon();
+
+  // Build API-based services and stylists
+  const apiServices = useMemo(() => {
+    if (isDemo || !serviceGroupsData) return SERVICES;
+    const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : [];
+    const flat: typeof SERVICES = [];
+    groups.forEach((group: any) => {
+      const mainSvc = group.mainService;
+      if (mainSvc) {
+        flat.push({
+          id: mainSvc._id,
+          name: mainSvc.title || 'Service',
+          duration: `${mainSvc.requiredTime || 60} min`,
+          price: mainSvc.charges || 0,
+          category: 'All',
+        });
+      }
+      (group.subServices || []).forEach((sub: any) => {
+        flat.push({
+          id: sub._id,
+          name: sub.title || 'Sub-service',
+          duration: `${sub.requiredTime || 30} min`,
+          price: sub.charges || 0,
+          category: 'All',
+        });
+      });
+    });
+    return flat.length > 0 ? flat : SERVICES;
+  }, [isDemo, serviceGroupsData]);
+
+  const apiStylists = useMemo(() => {
+    if (isDemo || !stylistsData) return STYLISTS;
+    const list = Array.isArray(stylistsData) ? stylistsData : stylistsData.users || stylistsData.stylists || [];
+    const mapped = list.map((s: any) => ({
+      id: s._id || s.id,
+      name: s.name || 'Stylist',
+      initial: (s.name || 'S')[0].toUpperCase(),
+      status: (s.active !== false ? 'available' : 'busy') as 'available' | 'busy',
+    }));
+    return mapped.length > 0 ? mapped : STYLISTS;
+  }, [isDemo, stylistsData]);
+
+  const displayServices = apiServices;
+  const displayStylists = apiStylists;
+
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedService, setSelectedService] = useState<string | null>(null);
@@ -95,8 +150,8 @@ export default function NewAppointmentScreen() {
   const [notes, setNotes] = useState('');
 
   const filteredServices = selectedCategory === 'All'
-    ? SERVICES
-    : SERVICES.filter((s) => s.category === selectedCategory);
+    ? displayServices
+    : displayServices.filter((s) => s.category === selectedCategory);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -227,7 +282,7 @@ export default function NewAppointmentScreen() {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stylistScroll}>
-            {STYLISTS.map((stylist) => (
+            {displayStylists.map((stylist) => (
               <TouchableOpacity
                 key={stylist.id}
                 style={[styles.stylistCard, selectedStylist === stylist.id && styles.stylistCardActive]}
@@ -345,8 +400,56 @@ export default function NewAppointmentScreen() {
 
       {/* Sticky bottom button */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.bookButton} activeOpacity={0.8}>
-          <Text style={styles.bookButtonText}>Book Appointment</Text>
+        <TouchableOpacity
+          style={styles.bookButton}
+          activeOpacity={0.8}
+          disabled={createAppointmentMutation.isPending}
+          onPress={() => {
+            if (isDemo) {
+              Alert.alert('Success', 'Appointment booked', [{ text: 'OK', onPress: () => router.back() }]);
+              return;
+            }
+            if (!selectedService || !selectedStylist || !selectedTime) {
+              Alert.alert('Validation', 'Please select a service, stylist, date and time');
+              return;
+            }
+            const selectedDayObj = DAYS[parseInt(selectedDay.replace('day-', ''))];
+            const appointmentDate = selectedDayObj?.full?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+            const svc = displayServices.find((s) => s.id === selectedService);
+            createAppointmentMutation.mutate(
+              {
+                data: {
+                  appointmentDate,
+                  timeData: {
+                    timeAsADate: new Date().toISOString(),
+                    timeAsAString: selectedTime,
+                    id: '',
+                  },
+                  salon: salonId || '',
+                  stylistId: selectedStylist,
+                  mainService: selectedService,
+                  subService: '',
+                  comment: notes,
+                  requiredDuration: parseInt(svc?.duration || '60') || 60,
+                },
+                offset: new Date().getTimezoneOffset(),
+              },
+              {
+                onSuccess: () => {
+                  Alert.alert('Success', 'Appointment booked', [{ text: 'OK', onPress: () => router.back() }]);
+                },
+                onError: (err: any) => {
+                  Alert.alert('Error', err?.message || 'Failed to book appointment');
+                },
+              },
+            );
+          }}
+        >
+          {createAppointmentMutation.isPending ? (
+            <ActivityIndicator size="small" color={colors.textWhite} />
+          ) : (
+            <Text style={styles.bookButtonText}>Book Appointment</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

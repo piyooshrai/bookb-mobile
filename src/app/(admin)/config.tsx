@@ -1,22 +1,56 @@
 import { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path } from 'react-native-svg';
 import { useAuthStore } from '@/stores/authStore';
+import { useAdminDashboard } from '@/hooks/useReports';
+import { useUsers } from '@/hooks/useAuth';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
-const userManagementRows = [
-  { label: 'Total Users', value: '8,420', badge: null },
-  { label: 'Active Salons', value: '128', badge: null },
-  { label: 'Pending Approvals', value: '3', badge: 3 },
+const MOCK_USER_MANAGEMENT_ROWS = [
+  { label: 'Total Users', value: '8,420', badge: null as number | null },
+  { label: 'Active Salons', value: '128', badge: null as number | null },
+  { label: 'Pending Approvals', value: '3', badge: 3 as number | null },
 ];
 
 export default function AdminConfigScreen() {
   const router = useRouter();
   const { logout, isDemo } = useAuthStore();
+
+  const { data: dashboardData, isLoading: dashboardLoading } = useAdminDashboard();
+  const { data: usersData, isLoading: usersLoading } = useUsers({ pageNumber: 1, pageSize: 1 });
+
+  // Map API data to user management rows (fallback to mock when demo or no data)
+  const userManagementRows = !isDemo && dashboardData
+    ? [
+        {
+          label: 'Total Users',
+          value: dashboardData.totalUsers != null
+            ? Number(dashboardData.totalUsers).toLocaleString()
+            : MOCK_USER_MANAGEMENT_ROWS[0].value,
+          badge: null as number | null,
+        },
+        {
+          label: 'Active Salons',
+          value: dashboardData.activeSalons != null
+            ? String(dashboardData.activeSalons)
+            : MOCK_USER_MANAGEMENT_ROWS[1].value,
+          badge: null as number | null,
+        },
+        {
+          label: 'Pending Approvals',
+          value: dashboardData.pendingApprovals != null
+            ? String(dashboardData.pendingApprovals)
+            : MOCK_USER_MANAGEMENT_ROWS[2].value,
+          badge: dashboardData.pendingApprovals != null
+            ? (dashboardData.pendingApprovals > 0 ? Number(dashboardData.pendingApprovals) : null)
+            : MOCK_USER_MANAGEMENT_ROWS[2].badge,
+        },
+      ]
+    : MOCK_USER_MANAGEMENT_ROWS;
 
   // Feature flag toggles
   const [maintenanceMode, setMaintenanceMode] = useState(false);

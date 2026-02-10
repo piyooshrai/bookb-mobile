@@ -1,8 +1,12 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useServiceGroups } from '@/hooks/useServices';
+import { productsApi } from '@/api/products';
+import { useQueryClient } from '@tanstack/react-query';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -19,6 +23,32 @@ const paymentMethods = ['Card', 'Cash', 'Apple Pay'];
 
 export default function CreatePOSScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const salonId = useAuthStore((s) => s.salonId);
+  const queryClient = useQueryClient();
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load real services
+  const { data: serviceGroupsData } = useServiceGroups();
+
+  const apiServices = useMemo(() => {
+    if (isDemo || !serviceGroupsData) return services;
+    const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : [];
+    const flat: typeof services = [];
+    groups.forEach((group: any) => {
+      const mainSvc = group.mainService;
+      if (mainSvc) {
+        flat.push({ id: mainSvc._id, name: mainSvc.title || 'Service', price: mainSvc.charges || 0 });
+      }
+      (group.subServices || []).forEach((sub: any) => {
+        flat.push({ id: sub._id, name: sub.title || 'Sub-service', price: sub.charges || 0 });
+      });
+    });
+    return flat.length > 0 ? flat : services;
+  }, [isDemo, serviceGroupsData]);
+
+  const displayServices = apiServices;
+
   const [clientName, setClientName] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState('Card');
@@ -33,20 +63,53 @@ export default function CreatePOSScreen() {
   };
 
   const servicesTotal = selectedServices.reduce((sum, serviceId) => {
-    const service = services.find(s => s.id === serviceId);
+    const service = displayServices.find(s => s.id === serviceId);
     return sum + (service?.price || 0);
   }, 0);
 
   const tipAmount = parseFloat(tip.replace(/[^0-9.]/g, '')) || 0;
   const total = servicesTotal + tipAmount;
 
-  const handleCompleteTransaction = () => {
-    Alert.alert('Success', 'Transaction completed', [
-      {
-        text: 'OK',
-        onPress: () => router.back(),
-      },
-    ]);
+  const handleCompleteTransaction = async () => {
+    if (isDemo) {
+      Alert.alert('Success', 'Transaction completed', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+      return;
+    }
+
+    if (selectedServices.length === 0) {
+      Alert.alert('Validation', 'Please select at least one service');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const items = selectedServices.map((serviceId) => {
+        const service = displayServices.find((s) => s.id === serviceId);
+        return {
+          product: serviceId,
+          quantity: 1,
+          price: service?.price || 0,
+        };
+      });
+      await productsApi.createOrder({
+        items,
+        totalAmount: total,
+        amount: servicesTotal,
+        otherAmount: tipAmount,
+        orderType: 'pos' as any,
+        salon: salonId || undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      Alert.alert('Success', 'Transaction completed', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to complete transaction');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -84,7 +147,7 @@ export default function CreatePOSScreen() {
         <View>
           <Text style={styles.sectionTitle}>Select Services</Text>
           <View style={{ gap: 10 }}>
-            {services.map(service => {
+            {displayServices.map(service => {
               const isSelected = selectedServices.includes(service.id);
               return (
                 <TouchableOpacity
@@ -165,8 +228,12 @@ export default function CreatePOSScreen() {
 
       {/* Bottom Button */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.button} onPress={handleCompleteTransaction}>
-          <Text style={styles.buttonText}>COMPLETE TRANSACTION</Text>
+        <TouchableOpacity style={styles.button} onPress={handleCompleteTransaction} disabled={isSaving}>
+          {isSaving ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.buttonText}>COMPLETE TRANSACTION</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

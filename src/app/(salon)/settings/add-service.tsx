@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useCreateService } from '@/hooks/useServices';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -12,6 +14,10 @@ import { fontFamilies } from '@/theme/typography';
 
 export default function AddServiceScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const salonId = useAuthStore((s) => s.salonId);
+
+  const createServiceMutation = useCreateService();
 
   const [serviceName, setServiceName] = useState('');
   const [description, setDescription] = useState('');
@@ -22,9 +28,40 @@ export default function AddServiceScreen() {
   const [breakTime, setBreakTime] = useState('');
 
   const handleSave = () => {
-    Alert.alert('Success', 'Service added', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    if (isDemo) {
+      Alert.alert('Success', 'Service added', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+      return;
+    }
+
+    if (!serviceName.trim()) {
+      Alert.alert('Validation', 'Please enter a service name');
+      return;
+    }
+
+    createServiceMutation.mutate(
+      {
+        title: serviceName.trim(),
+        description: description.trim(),
+        charges: parseFloat(price) || 0,
+        requiredTime: parseInt(duration) || 30,
+        leadTime: parseInt(leadTime) || 0,
+        breakTime: parseInt(breakTime) || 0,
+        isMainService,
+        salon: salonId || undefined,
+      },
+      {
+        onSuccess: () => {
+          Alert.alert('Success', 'Service added', [
+            { text: 'OK', onPress: () => router.back() },
+          ]);
+        },
+        onError: (err: any) => {
+          Alert.alert('Error', err?.message || 'Failed to create service');
+        },
+      },
+    );
   };
 
   return (
@@ -160,8 +197,12 @@ export default function AddServiceScreen() {
 
       {/* Save Button */}
       <View style={styles.saveButtonContainer}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8}>
-          <Text style={styles.saveButtonText}>SAVE SERVICE</Text>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8} disabled={createServiceMutation.isPending}>
+          {createServiceMutation.isPending ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.saveButtonText}>SAVE SERVICE</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

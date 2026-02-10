@@ -1,8 +1,15 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Line, Polyline } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useAdminSubscription } from '@/hooks/useReports';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+
+// NOTE: No dedicated usePlans hook exists yet. plansApi is available at '@/api/plans'
+// but a React Query hook has not been created for it. When a usePlans hook is added,
+// connect it here to replace MOCK_PLANS with real plan data.
+// For now, useAdminSubscription is used to populate subscriber counts per plan.
 
 const MOCK_PLANS = [
   {
@@ -52,9 +59,25 @@ const MOCK_PLANS = [
   },
 ];
 
-const totalSubscribers = MOCK_PLANS.reduce((sum, p) => sum + p.subscribers, 0);
+const MOCK_TOTAL_SUBSCRIBERS = MOCK_PLANS.reduce((sum, p) => sum + p.subscribers, 0);
 
 export default function Plans() {
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const { data: subscriptionData, isLoading } = useAdminSubscription();
+
+  // Map API subscription data to enrich plan cards with real subscriber counts
+  const plans = !isDemo && subscriptionData && Array.isArray(subscriptionData)
+    ? MOCK_PLANS.map((mockPlan) => {
+        const apiMatch = subscriptionData.find(
+          (item: { plan: string; count: number }) =>
+            item.plan?.toLowerCase() === mockPlan.name.toLowerCase(),
+        );
+        return apiMatch ? { ...mockPlan, subscribers: apiMatch.count } : mockPlan;
+      })
+    : MOCK_PLANS;
+
+  const totalSubscribers = plans.reduce((sum, p) => sum + p.subscribers, 0);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -64,27 +87,35 @@ export default function Plans() {
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         {/* Summary Bar */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{totalSubscribers}</Text>
-            <Text style={styles.summaryLabel}>Total Subs</Text>
+        {!isDemo && isLoading ? (
+          <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={colors.gold} />
           </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>
-              ${((MOCK_PLANS[0].price * MOCK_PLANS[0].subscribers) + (MOCK_PLANS[1].price * MOCK_PLANS[1].subscribers) + (MOCK_PLANS[2].price * MOCK_PLANS[2].subscribers)).toLocaleString()}
-            </Text>
-            <Text style={styles.summaryLabel}>Monthly MRR</Text>
+        ) : (
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>{totalSubscribers}</Text>
+              <Text style={styles.summaryLabel}>Total Subs</Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>
+                ${plans.reduce((sum, p) => sum + p.price * p.subscribers, 0).toLocaleString()}
+              </Text>
+              <Text style={styles.summaryLabel}>Monthly MRR</Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>
+                ${totalSubscribers > 0 ? Math.round(plans.reduce((sum, p) => sum + p.price * p.subscribers, 0) / totalSubscribers) : 0}
+              </Text>
+              <Text style={styles.summaryLabel}>Avg Revenue</Text>
+            </View>
           </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>$67</Text>
-            <Text style={styles.summaryLabel}>Avg Revenue</Text>
-          </View>
-        </View>
+        )}
 
         {/* Plan Cards */}
-        {MOCK_PLANS.map((plan) => (
+        {plans.map((plan) => (
           <View
             key={plan.id}
             style={[

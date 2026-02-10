@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useCreateCoupon } from '@/hooks/useCoupons';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -12,6 +14,10 @@ import { fontFamilies } from '@/theme/typography';
 
 export default function AddCouponScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const salonId = useAuthStore((s) => s.salonId);
+
+  const createCouponMutation = useCreateCoupon();
 
   const [couponCode, setCouponCode] = useState('');
   const [isPercentage, setIsPercentage] = useState(true);
@@ -21,9 +27,40 @@ export default function AddCouponScreen() {
   const [expiryDate, setExpiryDate] = useState('');
 
   const handleSave = () => {
-    Alert.alert('Success', 'Coupon created', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    if (isDemo) {
+      Alert.alert('Success', 'Coupon created', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+      return;
+    }
+
+    if (!couponCode.trim()) {
+      Alert.alert('Validation', 'Please enter a coupon code');
+      return;
+    }
+
+    const today = new Date().toISOString();
+    createCouponMutation.mutate(
+      {
+        title: couponCode.trim(),
+        description: description.trim(),
+        code: couponCode.trim(),
+        startDate: today,
+        expireDate: expiryDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+        discount: discountValue || '0',
+        salon: salonId || undefined,
+      },
+      {
+        onSuccess: () => {
+          Alert.alert('Success', 'Coupon created', [
+            { text: 'OK', onPress: () => router.back() },
+          ]);
+        },
+        onError: (err: any) => {
+          Alert.alert('Error', err?.message || 'Failed to create coupon');
+        },
+      },
+    );
   };
 
   return (
@@ -140,8 +177,12 @@ export default function AddCouponScreen() {
 
       {/* Save Button */}
       <View style={styles.saveButtonContainer}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8}>
-          <Text style={styles.saveButtonText}>CREATE COUPON</Text>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8} disabled={createCouponMutation.isPending}>
+          {createCouponMutation.isPending ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.saveButtonText}>CREATE COUPON</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

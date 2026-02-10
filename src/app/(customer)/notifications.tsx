@@ -1,8 +1,10 @@
-import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useUserNotifications } from '@/hooks/useNotifications';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -107,6 +109,42 @@ const NOTIFICATIONS: Notification[] = [
   },
 ];
 
+function inferNotificationType(title: string): NotificationType {
+  const lower = title.toLowerCase();
+  if (lower.includes('cancel')) return 'appointment_canceled';
+  if (lower.includes('confirm')) return 'appointment_confirmed';
+  if (lower.includes('remind') || lower.includes('upcoming') || lower.includes('forget')) return 'appointment_reminder';
+  if (lower.includes('reward') || lower.includes('coin') || lower.includes('bonus') || lower.includes('referral')) return 'reward_earned';
+  if (lower.includes('order') || lower.includes('ready') || lower.includes('shipped') || lower.includes('pickup')) return 'order_ready';
+  return 'appointment_confirmed';
+}
+
+function getNotificationGroup(createdAt: string): 'today' | 'yesterday' | 'earlier' {
+  const now = new Date();
+  const created = new Date(createdAt);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+
+  if (createdDay.getTime() >= today.getTime()) return 'today';
+  if (createdDay.getTime() >= yesterday.getTime()) return 'yesterday';
+  return 'earlier';
+}
+
+function formatNotificationTime(createdAt: string): string {
+  const now = new Date();
+  const created = new Date(createdAt);
+  const diffMs = now.getTime() - created.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMs / 3600000);
+
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin} min ago`;
+  if (diffHr < 24) return `${diffHr} hr${diffHr > 1 ? 's' : ''} ago`;
+  return created.toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+}
+
 function getNotificationIcon(type: NotificationType) {
   switch (type) {
     case 'appointment_confirmed':
@@ -193,7 +231,29 @@ function groupLabel(group: Notification['group']): string {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const { data: notificationsData, isLoading } = useUserNotifications(
+    { pageNumber: 1, pageSize: 50 },
+    !isDemo,
+  );
   const [notifications, setNotifications] = useState<Notification[]>(NOTIFICATIONS);
+
+  useEffect(() => {
+    if (!isDemo && notificationsData?.result?.length) {
+      const mapped: Notification[] = notificationsData.result.map((n) => ({
+        id: n._id,
+        type: inferNotificationType(n.title),
+        title: n.title,
+        message: n.body,
+        time: formatNotificationTime(n.createdAt),
+        read: false,
+        group: getNotificationGroup(n.createdAt),
+      }));
+      setNotifications(mapped);
+    } else if (isDemo) {
+      setNotifications(NOTIFICATIONS);
+    }
+  }, [isDemo, notificationsData]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -274,7 +334,13 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.bodyContent}
         showsVerticalScrollIndicator={false}
       >
-        {groups.map((group) => {
+        {isLoading && !isDemo && (
+          <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.gold} />
+          </View>
+        )}
+
+        {(!isLoading || isDemo) && groups.map((group) => {
           const groupNotifications = notifications.filter((n) => n.group === group);
           if (groupNotifications.length === 0) return null;
 
@@ -324,7 +390,7 @@ export default function NotificationsScreen() {
           );
         })}
 
-        {notifications.length === 0 && (
+        {!isLoading && notifications.length === 0 && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconCircle}>
               <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">

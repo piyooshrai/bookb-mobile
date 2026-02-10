@@ -1,9 +1,11 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Rect, Line, Circle } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useAuthStore } from '@/stores/authStore';
+import { useOrdersByUser } from '@/hooks/useProducts';
 
 const MOCK_ORDERS = [
   { id: 'BKB-1047', date: 'Feb 8, 2026', items: 3, total: 98, status: 'Completed' as const },
@@ -21,6 +23,18 @@ const STATUS_CONFIG = {
 
 export default function OrderHistoryScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const { data: apiOrders, isLoading: ordersLoading } = useOrdersByUser({ pageNumber: 1, pageSize: 20 });
+
+  const orders = !isDemo && apiOrders?.result
+    ? apiOrders.result.map((o: any) => ({
+        id: o.orderId || o._id,
+        date: new Date(o.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        items: o.items?.length || 0,
+        total: o.totalAmount || 0,
+        status: (o.orderStatus || 'Completed') as 'Completed' | 'Pending' | 'Cancel',
+      }))
+    : MOCK_ORDERS;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -34,13 +48,18 @@ export default function OrderHistoryScreen() {
           </TouchableOpacity>
           <View>
             <Text style={styles.title}>Order History</Text>
-            <Text style={styles.subtitle}>{MOCK_ORDERS.length} past orders</Text>
+            <Text style={styles.subtitle}>{orders.length} past orders</Text>
           </View>
         </View>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        {MOCK_ORDERS.map((order) => {
+        {!isDemo && ordersLoading && (
+          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={colors.navy} />
+          </View>
+        )}
+        {orders.map((order) => {
           const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.Completed;
           return (
             <View key={order.id} style={styles.orderCard}>
