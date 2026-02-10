@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,47 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 import { useCheckMobile } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { UserRole } from '@/api/types';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+
+const COUNTRY_CODES = [
+  { code: '+1', country: 'US', label: 'United States' },
+  { code: '+44', country: 'UK', label: 'United Kingdom' },
+  { code: '+971', country: 'AE', label: 'UAE' },
+  { code: '+966', country: 'SA', label: 'Saudi Arabia' },
+  { code: '+973', country: 'BH', label: 'Bahrain' },
+  { code: '+965', country: 'KW', label: 'Kuwait' },
+  { code: '+974', country: 'QA', label: 'Qatar' },
+  { code: '+968', country: 'OM', label: 'Oman' },
+] as const;
+
+function detectDefaultCountryCode(): string {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (tz.startsWith('America/')) return '+1';
+    if (tz === 'Europe/London' || tz.startsWith('Europe/')) return '+44';
+    if (tz === 'Asia/Dubai') return '+971';
+    if (tz === 'Asia/Riyadh') return '+966';
+    if (tz === 'Asia/Bahrain') return '+973';
+    if (tz === 'Asia/Kuwait') return '+965';
+    if (tz === 'Asia/Qatar') return '+974';
+    if (tz === 'Asia/Muscat') return '+968';
+  } catch {
+    // fallback
+  }
+  return '+1';
+}
 
 const DEMO_ROLES: { role: UserRole; label: string }[] = [
   { role: 'salon', label: 'Salon Owner' },
@@ -28,11 +59,18 @@ const DEMO_ROLES: { role: UserRole; label: string }[] = [
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [countryCode, setCountryCode] = useState('+44');
+  const [countryCode, setCountryCode] = useState('+1');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
+  const [pickerVisible, setPickerVisible] = useState(false);
   const checkMobile = useCheckMobile();
   const demoLogin = useAuthStore((s) => s.demoLogin);
+
+  useEffect(() => {
+    setCountryCode(detectDefaultCountryCode());
+  }, []);
+
+  const selectedCountry = COUNTRY_CODES.find((c) => c.code === countryCode) || COUNTRY_CODES[0];
 
   const handleSendOtp = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -110,14 +148,17 @@ export default function LoginScreen() {
 
           <Animated.View entering={FadeInDown.duration(600).delay(400)} style={styles.form}>
             <View style={styles.phoneRow}>
-              <TextInput
-                style={styles.countryCode}
-                value={countryCode}
-                onChangeText={setCountryCode}
-                keyboardType="phone-pad"
-                maxLength={4}
-                placeholderTextColor={colors.textTertiary}
-              />
+              <TouchableOpacity
+                style={styles.countryCodeButton}
+                onPress={() => setPickerVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.countryCodeText}>{selectedCountry.country}</Text>
+                <Text style={styles.countryCodeValue}>{countryCode}</Text>
+                <Svg width={10} height={6} viewBox="0 0 10 6" fill="none">
+                  <Path d="M1 1l4 4 4-4" stroke="rgba(255,255,255,0.4)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              </TouchableOpacity>
               <TextInput
                 style={styles.phoneInput}
                 placeholder="Mobile number"
@@ -182,6 +223,51 @@ export default function LoginScreen() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={pickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setPickerVisible(false)}
+        >
+          <View style={styles.pickerContainer}>
+            <Text style={styles.pickerTitle}>Select Country</Text>
+            <FlatList
+              data={COUNTRY_CODES}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerItem,
+                    item.code === countryCode && styles.pickerItemActive,
+                  ]}
+                  onPress={() => {
+                    setCountryCode(item.code);
+                    setPickerVisible(false);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  <View style={styles.pickerItemLeft}>
+                    <Text style={styles.pickerItemCountry}>{item.country}</Text>
+                    <Text style={styles.pickerItemLabel}>{item.label}</Text>
+                  </View>
+                  <Text style={[
+                    styles.pickerItemCode,
+                    item.code === countryCode && styles.pickerItemCodeActive,
+                  ]}>
+                    {item.code}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -228,17 +314,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  countryCode: {
-    width: 76,
+  countryCodeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)',
     borderRadius: 14,
     paddingVertical: 18,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
+  },
+  countryCodeText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontFamily: fontFamilies.body,
+  },
+  countryCodeValue: {
     color: '#d4d1cc',
     fontSize: 14,
-    textAlign: 'center',
     fontFamily: fontFamilies.bodyMedium,
   },
   phoneInput: {
@@ -331,5 +425,63 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fontFamilies.bodyMedium,
     letterSpacing: 0.5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  pickerContainer: {
+    backgroundColor: colors.navy,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    maxHeight: 420,
+    overflow: 'hidden',
+  },
+  pickerTitle: {
+    fontFamily: fontFamilies.heading,
+    fontSize: 18,
+    color: colors.textWhite,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  pickerItemActive: {
+    backgroundColor: 'rgba(196,151,61,0.1)',
+  },
+  pickerItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pickerItemCountry: {
+    color: colors.goldLight,
+    fontSize: 13,
+    fontFamily: fontFamilies.bodySemiBold,
+    width: 28,
+  },
+  pickerItemLabel: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    fontFamily: fontFamilies.body,
+  },
+  pickerItemCode: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 14,
+    fontFamily: fontFamilies.bodyMedium,
+  },
+  pickerItemCodeActive: {
+    color: colors.gold,
   },
 });
