@@ -29,24 +29,25 @@ const OFFSET = new Date().getTimezoneOffset();
 
 // ─── Credentials ────────────────────────────────────────────────────────────
 const SALON_OWNER = {
-  name: 'Luxe Hair Studio',
-  email: 'luxe@bookb.app',
+  name: 'Sophia Chen',
+  salonName: 'Luxe',
+  email: 'sophia.chen@luxemiami.com',
   password: 'BookB2026!',
-  phone: '2125550147',
+  phone: '3055550147',
   countryCode: '+1',
   role: 'salon',
-  gender: 'other',
-  address: '142 West 57th Street, New York, NY 10019',
-  description: 'Premier hair salon in Midtown Manhattan specializing in color, cuts, and luxury treatments.',
+  gender: 'female',
+  address: '1200 Brickell Avenue, Miami, FL 33131',
+  description: 'Premier hair salon in Brickell, Miami specializing in color, cuts, and luxury treatments.',
   packageName: 'com.bookb.app',
 };
 
 const STYLISTS = [
   {
-    name: 'Jessica Rivera',
-    email: 'jessica@luxehair.com',
+    name: 'Isabella Torres',
+    email: 'isabella@luxemiami.com',
     password: 'BookB2026!',
-    phone: '2125550201',
+    phone: '3055550201',
     countryCode: '+1',
     gender: 'female',
     description: 'Senior Color Specialist with 12 years experience. Balayage and vivid color expert.',
@@ -55,10 +56,10 @@ const STYLISTS = [
     intervalTime: '30',
   },
   {
-    name: 'Marcus Chen',
-    email: 'marcus@luxehair.com',
+    name: 'Marcus Williams',
+    email: 'marcus@luxemiami.com',
     password: 'BookB2026!',
-    phone: '2125550202',
+    phone: '3055550202',
     countryCode: '+1',
     gender: 'male',
     description: 'Master Barber & Stylist. Precision cuts, fades, and modern mens styling.',
@@ -67,10 +68,10 @@ const STYLISTS = [
     intervalTime: '30',
   },
   {
-    name: 'Amara Johnson',
-    email: 'amara@luxehair.com',
+    name: 'Camila Reyes',
+    email: 'camila@luxemiami.com',
     password: 'BookB2026!',
-    phone: '2125550203',
+    phone: '3055550203',
     countryCode: '+1',
     gender: 'female',
     description: 'Texture Specialist. Natural hair, braids, silk press, and keratin treatments.',
@@ -81,14 +82,14 @@ const STYLISTS = [
 ];
 
 const CLIENTS = [
-  { name: 'Sarah Mitchell', email: 'sarah.m@gmail.com', phone: '2125550301', countryCode: '+1', gender: 'female' },
-  { name: 'David Park', email: 'david.park@gmail.com', phone: '2125550302', countryCode: '+1', gender: 'male' },
-  { name: 'Emily Watson', email: 'emily.watson@gmail.com', phone: '2125550303', countryCode: '+1', gender: 'female' },
-  { name: 'James Rodriguez', email: 'james.rod@gmail.com', phone: '2125550304', countryCode: '+1', gender: 'male' },
-  { name: 'Olivia Thompson', email: 'olivia.t@gmail.com', phone: '2125550305', countryCode: '+1', gender: 'female' },
-  { name: 'Michael Brown', email: 'michael.b@gmail.com', phone: '2125550306', countryCode: '+1', gender: 'male' },
-  { name: 'Sophia Garcia', email: 'sophia.g@gmail.com', phone: '2125550307', countryCode: '+1', gender: 'female' },
-  { name: 'Daniel Kim', email: 'daniel.kim@gmail.com', phone: '2125550308', countryCode: '+1', gender: 'male' },
+  { name: 'Ana Martinez', email: 'ana.m@gmail.com', phone: '3055550301', countryCode: '+1', gender: 'female' },
+  { name: 'David Park', email: 'david.park@gmail.com', phone: '3055550302', countryCode: '+1', gender: 'male' },
+  { name: 'Emily Watson', email: 'emily.watson@gmail.com', phone: '3055550303', countryCode: '+1', gender: 'female' },
+  { name: 'James Rodriguez', email: 'james.rod@gmail.com', phone: '3055550304', countryCode: '+1', gender: 'male' },
+  { name: 'Olivia Thompson', email: 'olivia.t@gmail.com', phone: '3055550305', countryCode: '+1', gender: 'female' },
+  { name: 'Michael Brown', email: 'michael.b@gmail.com', phone: '3055550306', countryCode: '+1', gender: 'male' },
+  { name: 'Lucia Fernandez', email: 'lucia.f@gmail.com', phone: '3055550307', countryCode: '+1', gender: 'female' },
+  { name: 'Daniel Kim', email: 'daniel.kim@gmail.com', phone: '3055550308', countryCode: '+1', gender: 'male' },
 ];
 
 const SERVICE_CATEGORIES = [
@@ -343,7 +344,7 @@ async function setupSalonOwner() {
       try {
         log('ℹ️', 'Creating salon entity...');
         const salonRes = await api.post('/salon/create-salon', {
-          name: SALON_OWNER.name,
+          name: SALON_OWNER.salonName,
           address: SALON_OWNER.address,
           description: SALON_OWNER.description,
           packageName: SALON_OWNER.packageName,
@@ -814,7 +815,7 @@ async function main() {
     console.log('╚══════════════════════════════════════════════════════╝\n');
 
     console.log('Data created:');
-    console.log(`  - 1 Salon: ${SALON_OWNER.name}`);
+    console.log(`  - 1 Salon: ${SALON_OWNER.salonName} (Owner: ${SALON_OWNER.name})`);
     console.log(`  - ${STYLISTS.length} Stylists`);
     console.log(`  - ${SERVICE_CATEGORIES.length} Service categories, ${SERVICE_CATEGORIES.reduce((sum, c) => sum + c.subServices.length, 0)} services`);
     console.log(`  - ${PRODUCT_CATEGORIES.length} Product categories, ${PRODUCTS.length} products`);
