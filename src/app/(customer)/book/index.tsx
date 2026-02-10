@@ -1,66 +1,56 @@
+import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Circle, Line } from 'react-native-svg';
+import { useRouter } from 'expo-router';
+import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
-const STEPS = ['Salon', 'Service', 'Stylist', 'Time'];
+const STEPS = ['Service', 'Stylist', 'Time'];
 const ACTIVE_STEP = 0;
 
-const MOCK_SALONS = [
-  {
-    id: '1',
-    name: 'Luxe Hair Studio',
-    rating: 4.9,
-    reviews: 284,
-    distance: '0.3 mi',
-    speciality: 'Color & Styling',
-    address: '142 West 57th St',
-  },
-  {
-    id: '2',
-    name: 'The Grooming Room',
-    rating: 4.7,
-    reviews: 156,
-    distance: '0.8 mi',
-    speciality: 'Barbering & Fades',
-    address: '89 East 42nd St',
-  },
-  {
-    id: '3',
-    name: 'Bella Vita Salon',
-    rating: 4.8,
-    reviews: 312,
-    distance: '1.2 mi',
-    speciality: 'Bridal & Events',
-    address: '220 Madison Ave',
-  },
-  {
-    id: '4',
-    name: 'Urban Cuts',
-    rating: 4.6,
-    reviews: 98,
-    distance: '1.5 mi',
-    speciality: 'Modern Cuts & Texture',
-    address: '55 Spring St',
-  },
-  {
-    id: '5',
-    name: 'Serenity Beauty Bar',
-    rating: 4.9,
-    reviews: 201,
-    distance: '2.1 mi',
-    speciality: 'Extensions & Treatments',
-    address: '310 Bleecker St',
-  },
+const CATEGORIES = ['All', 'Hair', 'Color', 'Treatment', 'Styling'];
+
+const MOCK_SERVICES = [
+  { id: '1', name: 'Haircut & Style', duration: '45 min', price: 65, description: 'Precision cut with wash and blowout finish', category: 'Hair' },
+  { id: '2', name: 'Balayage', duration: '120 min', price: 185, description: 'Hand-painted highlights for a natural sun-kissed look', category: 'Color' },
+  { id: '3', name: 'Blowout', duration: '30 min', price: 45, description: 'Professional wash, dry, and style', category: 'Styling' },
+  { id: '4', name: 'Keratin Treatment', duration: '120 min', price: 220, description: 'Smoothing treatment for frizz-free, silky hair', category: 'Treatment' },
+  { id: '5', name: 'Color Correction', duration: '150 min', price: 250, description: 'Expert color fix and tone adjustment', category: 'Color' },
+  { id: '6', name: 'Root Touch-Up', duration: '60 min', price: 85, description: 'Seamless root color refresh and blend', category: 'Color' },
+  { id: '7', name: 'Deep Conditioning', duration: '45 min', price: 55, description: 'Intensive moisture and repair treatment', category: 'Treatment' },
+  { id: '8', name: 'Beard Trim', duration: '20 min', price: 25, description: 'Shape and detail for a clean, polished look', category: 'Hair' },
 ];
 
 export default function BookAppointment() {
+  const router = useRouter();
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [selectedService, setSelectedService] = useState<string | null>(null);
+
+  const filteredServices = activeCategory === 'All'
+    ? MOCK_SERVICES
+    : MOCK_SERVICES.filter((s) => s.category === activeCategory);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Book Appointment</Text>
-        <Text style={styles.subtitle}>Find your perfect salon</Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+              <Path d="M19 12H5" stroke={colors.textWhite} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              <Path d="M12 19l-7-7 7-7" stroke={colors.textWhite} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.title}>Book Appointment</Text>
+            <Text style={styles.subtitle}>at Luxe Hair Studio</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
@@ -76,14 +66,20 @@ export default function BookAppointment() {
                     index < ACTIVE_STEP && styles.stepCircleCompleted,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.stepNumber,
-                      (index === ACTIVE_STEP || index < ACTIVE_STEP) && styles.stepNumberActive,
-                    ]}
-                  >
-                    {index + 1}
-                  </Text>
+                  {index < ACTIVE_STEP ? (
+                    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                      <Path d="M20 6L9 17l-5-5" stroke={colors.textWhite} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                    </Svg>
+                  ) : (
+                    <Text
+                      style={[
+                        styles.stepNumber,
+                        (index === ACTIVE_STEP || index < ACTIVE_STEP) && styles.stepNumberActive,
+                      ]}
+                    >
+                      {index + 1}
+                    </Text>
+                  )}
                 </View>
                 {index < STEPS.length - 1 && (
                   <View
@@ -107,63 +103,111 @@ export default function BookAppointment() {
         </View>
 
         {/* Section Title */}
-        <Text style={styles.sectionTitle}>Choose a Salon</Text>
-        <Text style={styles.sectionSubtitle}>Sorted by distance from you</Text>
+        <Text style={styles.sectionTitle}>Choose a Service</Text>
+        <Text style={styles.sectionSubtitle}>Select the service you'd like to book</Text>
 
-        {/* Salon List */}
-        {MOCK_SALONS.map((salon) => (
-          <TouchableOpacity key={salon.id} style={styles.salonCard} activeOpacity={0.7}>
-            <View style={styles.salonCardContent}>
-              <View style={styles.salonAvatar}>
-                <Text style={styles.salonInitial}>{salon.name[0]}</Text>
-              </View>
-              <View style={styles.salonInfo}>
-                <Text style={styles.salonName}>{salon.name}</Text>
-                <Text style={styles.salonSpeciality}>{salon.speciality}</Text>
-                <Text style={styles.salonAddress}>{salon.address}</Text>
-                <View style={styles.salonMeta}>
-                  {/* Star icon */}
+        {/* Category Pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryRow}
+          style={styles.categoryScroll}
+        >
+          {CATEGORIES.map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[
+                styles.categoryPill,
+                activeCategory === cat && styles.categoryPillActive,
+              ]}
+              onPress={() => setActiveCategory(cat)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.categoryText,
+                  activeCategory === cat && styles.categoryTextActive,
+                ]}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Service List */}
+        {filteredServices.map((service) => (
+          <TouchableOpacity
+            key={service.id}
+            style={[
+              styles.serviceCard,
+              selectedService === service.id && styles.serviceCardSelected,
+            ]}
+            onPress={() => setSelectedService(service.id)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.serviceCardContent}>
+              <View style={styles.serviceInfo}>
+                <Text style={styles.serviceName}>{service.name}</Text>
+                <Text style={styles.serviceDescription}>{service.description}</Text>
+                <View style={styles.serviceMeta}>
                   <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-                      fill={colors.gold}
-                      stroke={colors.gold}
-                      strokeWidth={1}
-                    />
+                    <Circle cx={12} cy={12} r={10} stroke={colors.textTertiary} strokeWidth={1.8} />
+                    <Path d="M12 6v6l4 2" stroke={colors.textTertiary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                   </Svg>
-                  <Text style={styles.salonRating}>{salon.rating}</Text>
-                  <Text style={styles.salonReviews}>({salon.reviews})</Text>
+                  <Text style={styles.serviceDuration}>{service.duration}</Text>
                   <View style={styles.metaDot} />
-                  {/* Location pin icon */}
-                  <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"
-                      stroke={colors.textTertiary}
-                      strokeWidth={1.8}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <Circle cx={12} cy={10} r={3} stroke={colors.textTertiary} strokeWidth={1.8} />
-                  </Svg>
-                  <Text style={styles.salonDistance}>{salon.distance}</Text>
+                  <Text style={styles.servicePrice}>${service.price}</Text>
                 </View>
               </View>
-              {/* Chevron */}
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                <Path
-                  d="M9 18l6-6-6-6"
-                  stroke={colors.textTertiary}
-                  strokeWidth={1.6}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </Svg>
+              <View
+                style={[
+                  styles.selectIndicator,
+                  selectedService === service.id && styles.selectIndicatorActive,
+                ]}
+              >
+                {selectedService === service.id && (
+                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                    <Path d="M20 6L9 17l-5-5" stroke={colors.white} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                )}
+              </View>
             </View>
           </TouchableOpacity>
         ))}
 
-        <View style={{ height: 20 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Bottom Continue Button */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={[
+            styles.continueButton,
+            !selectedService && styles.continueButtonDisabled,
+          ]}
+          activeOpacity={0.7}
+          disabled={!selectedService}
+        >
+          <Text
+            style={[
+              styles.continueText,
+              !selectedService && styles.continueTextDisabled,
+            ]}
+          >
+            CONTINUE
+          </Text>
+          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path
+              d="M5 12h14M12 5l7 7-7 7"
+              stroke={selectedService ? colors.white : colors.textTertiary}
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -178,11 +222,24 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     fontFamily: fontFamilies.heading,
     fontSize: 22,
     color: colors.textWhite,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   subtitle: {
     fontFamily: fontFamilies.body,
@@ -268,69 +325,79 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body,
     fontSize: 12,
     color: colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: 0,
   },
 
-  // Salon card
-  salonCard: {
+  // Category pills
+  categoryScroll: {
+    marginHorizontal: -20,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 20,
+  },
+  categoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  categoryPillActive: {
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
+  },
+  categoryText: {
+    fontFamily: fontFamilies.bodyMedium,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  categoryTextActive: {
+    color: colors.textWhite,
+  },
+
+  // Service card
+  serviceCard: {
     backgroundColor: colors.white,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
   },
-  salonCardContent: {
+  serviceCardSelected: {
+    borderColor: colors.navy,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(26,39,68,0.03)',
+  },
+  serviceCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  salonAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: colors.navy,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  salonInitial: {
-    fontFamily: fontFamilies.heading,
-    fontSize: 20,
-    color: colors.textWhite,
-  },
-  salonInfo: {
+  serviceInfo: {
     flex: 1,
-    paddingLeft: 14,
   },
-  salonName: {
+  serviceName: {
     fontFamily: fontFamilies.bodyMedium,
-    fontSize: 14,
+    fontSize: 15,
     color: colors.textPrimary,
+    marginBottom: 4,
   },
-  salonSpeciality: {
+  serviceDescription: {
     fontFamily: fontFamilies.body,
     fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 1,
+    marginBottom: 8,
   },
-  salonAddress: {
-    fontFamily: fontFamilies.body,
-    fontSize: 11,
-    color: colors.textTertiary,
-    marginTop: 1,
-  },
-  salonMeta: {
+  serviceMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
-    gap: 3,
+    gap: 5,
   },
-  salonRating: {
-    fontFamily: fontFamilies.bodySemiBold,
-    fontSize: 12,
-    color: colors.gold,
-  },
-  salonReviews: {
+  serviceDuration: {
     fontFamily: fontFamilies.body,
-    fontSize: 11,
+    fontSize: 12,
     color: colors.textTertiary,
   },
   metaDot: {
@@ -338,12 +405,59 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 1.5,
     backgroundColor: colors.textTertiary,
-    marginHorizontal: 4,
   },
-  salonDistance: {
-    fontFamily: fontFamilies.body,
-    fontSize: 11,
+  servicePrice: {
+    fontFamily: fontFamilies.heading,
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  selectIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  selectIndicatorActive: {
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
+  },
+
+  // Bottom bar
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 34,
+  },
+  continueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.gold,
+    borderRadius: 12,
+    paddingVertical: 16,
+  },
+  continueButtonDisabled: {
+    backgroundColor: colors.offWhite,
+  },
+  continueText: {
+    fontFamily: fontFamilies.bodySemiBold,
+    fontSize: 14,
+    color: colors.white,
+    letterSpacing: 2,
+  },
+  continueTextDisabled: {
     color: colors.textTertiary,
-    marginLeft: 2,
   },
 });
