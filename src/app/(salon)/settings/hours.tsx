@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Polyline, Line } from 'react-native-svg';
@@ -192,7 +192,7 @@ export default function BusinessHoursScreen() {
         </View>
 
         {/* Save Button */}
-        <TouchableOpacity style={styles.saveButton} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.saveButton} activeOpacity={0.7} onPress={() => Alert.alert('Success', 'Business hours updated', [{ text: 'OK' }])}>
           <Text style={styles.saveButtonText}>Save Changes</Text>
         </TouchableOpacity>
 

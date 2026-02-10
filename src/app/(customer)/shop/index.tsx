@@ -49,7 +49,7 @@ export default function ShopScreen() {
             <Text style={styles.subtitle}>Products from Luxe Hair Studio</Text>
           </View>
           {/* Cart icon with badge */}
-          <TouchableOpacity style={styles.cartButton} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.cartButton} activeOpacity={0.7} onPress={() => router.push('/(customer)/shop/cart')}>
             <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
               <Rect x={4} y={8} width={16} height={14} rx={2} stroke={colors.textWhite} strokeWidth={1.6} />
               <Path d="M8 8V6a4 4 0 0 1 8 0v2" stroke={colors.textWhite} strokeWidth={1.6} strokeLinecap="round" />
@@ -143,7 +143,7 @@ export default function ShopScreen() {
         </View>
 
         {/* My Orders row */}
-        <TouchableOpacity style={styles.ordersRow} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.ordersRow} activeOpacity={0.7} onPress={() => router.push('/(customer)/shop/orders')}>
           <View style={styles.ordersIconWrap}>
             <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
               <Rect x={3} y={3} width={18} height={18} rx={2} stroke={colors.navy} strokeWidth={1.6} />
@@ -180,7 +180,7 @@ export default function ShopScreen() {
               {CART_ITEMS} {(CART_ITEMS as number) === 1 ? 'item' : 'items'} - ${CART_TOTAL.toFixed(2)}
             </Text>
           </View>
-          <TouchableOpacity style={styles.checkoutButton} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.checkoutButton} activeOpacity={0.8} onPress={() => router.push('/(customer)/shop/cart')}>
             <Text style={styles.checkoutButtonText}>Checkout</Text>
             <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
               <Path
