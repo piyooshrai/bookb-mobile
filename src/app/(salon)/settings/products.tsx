@@ -54,7 +54,7 @@ export default function ProductsScreen() {
 
   const apiProducts: Product[] = useMemo(() => {
     if (isDemo || !productsData) return [];
-    const list = Array.isArray(productsData) ? productsData : productsData.products || productsData.data || [];
+    const list = Array.isArray(productsData) ? productsData : (productsData as any)?.result || (productsData as any)?.products || (productsData as any)?.data || [];
     return list.map((p: any) => ({
       id: p._id || p.id,
       name: p.productName || p.name || 'Product',
@@ -67,7 +67,7 @@ export default function ProductsScreen() {
 
   const apiFilterCategories: ProductCategory[] = useMemo(() => {
     if (isDemo || !categoriesData) return FILTER_CATEGORIES;
-    const cats = Array.isArray(categoriesData) ? categoriesData : [];
+    const cats = Array.isArray(categoriesData) ? categoriesData : (categoriesData as any)?.result || (categoriesData as any)?.categories || [];
     const names: ProductCategory[] = ['All' as ProductCategory, ...cats.map((c: any) => (c.name || c.title || 'Other') as ProductCategory)];
     return names.length > 1 ? names : FILTER_CATEGORIES;
   }, [isDemo, categoriesData]);

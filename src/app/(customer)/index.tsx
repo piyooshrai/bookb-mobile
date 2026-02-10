@@ -97,15 +97,17 @@ export default function CustomerHomeScreen() {
     price: getServicePrice(latestAppt.subService || latestAppt.mainService),
   } : { ...MOCK_UPCOMING, id: 'appt-001' };
 
-  const favStylist = !isDemo && stylistsData && stylistsData.length > 0 ? {
-    name: stylistsData[0].name || MOCK_STYLIST.name,
-    initial: (stylistsData[0].name || 'S').charAt(0),
-    speciality: stylistsData[0].description || MOCK_STYLIST.speciality,
+  const stylistsList = Array.isArray(stylistsData) ? stylistsData : (stylistsData as any)?.result ?? [];
+  const favStylist = !isDemo && stylistsList.length > 0 ? {
+    name: stylistsList[0].name || MOCK_STYLIST.name,
+    initial: (stylistsList[0].name || 'S').charAt(0),
+    speciality: stylistsList[0].description || MOCK_STYLIST.speciality,
     nextAvailable: MOCK_STYLIST.nextAvailable,
     visits: MOCK_STYLIST.visits,
   } : { ...MOCK_STYLIST, initial: 'J' };
 
-  const recentVisits = !isDemo && historyData?.result ? historyData.result.slice(0, 3).map((appt: Appointment) => ({
+  const historyList = Array.isArray(historyData) ? historyData : Array.isArray((historyData as any)?.result) ? (historyData as any).result : [];
+  const recentVisits = !isDemo && historyList.length > 0 ? historyList.slice(0, 3).map((appt: Appointment) => ({
     id: appt._id,
     date: appt.dateAsAString || '',
     service: getServiceName(appt.subService || appt.mainService),
@@ -258,7 +260,7 @@ export default function CustomerHomeScreen() {
           <View style={styles.recentHeader}>
             <Text style={styles.cardTitle}>Recent Visits</Text>
           </View>
-          {recentVisits.map((visit, index) => (
+          {recentVisits.map((visit: any, index: number) => (
             <View
               key={visit.id}
               style={[

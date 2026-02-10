@@ -239,8 +239,9 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>(NOTIFICATIONS);
 
   useEffect(() => {
-    if (!isDemo && notificationsData?.result?.length) {
-      const mapped: Notification[] = notificationsData.result.map((n) => ({
+    const notifList = Array.isArray(notificationsData) ? notificationsData : Array.isArray((notificationsData as any)?.result) ? (notificationsData as any).result : [];
+    if (!isDemo && notifList.length > 0) {
+      const mapped: Notification[] = notifList.map((n: any) => ({
         id: n._id,
         type: inferNotificationType(n.title),
         title: n.title,

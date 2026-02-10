@@ -59,10 +59,10 @@ export default function ServicesScreen() {
 
   const apiServices: Service[] = useMemo(() => {
     if (isDemo || !serviceGroupsData) return [];
-    const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : [];
+    const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : (serviceGroupsData as any)?.result || (serviceGroupsData as any)?.serviceGroups || [];
     const flat: Service[] = [];
     groups.forEach((group: any) => {
-      const mainSvc = group.mainService;
+      const mainSvc = group.mainService || group.category;
       if (mainSvc) {
         flat.push({
           id: mainSvc._id,
@@ -76,7 +76,8 @@ export default function ServicesScreen() {
           enabled: mainSvc.enable !== false,
         });
       }
-      const subs = group.subServices || [];
+      const rawSubs = group.subServices || group.subService || [];
+      const subs = Array.isArray(rawSubs) ? rawSubs : [];
       subs.forEach((sub: any) => {
         flat.push({
           id: sub._id,

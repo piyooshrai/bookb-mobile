@@ -26,7 +26,7 @@ export function useDashboardAppointments(data: GetAppointmentsRequest, enabled =
     queryKey: ['appointments', 'dashboard', data],
     queryFn: async () => {
       const res = await appointmentsApi.getFromDashboard(data);
-      return res.data;
+      return res.data ?? (res as any).result;
     },
     enabled,
   });

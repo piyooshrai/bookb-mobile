@@ -78,25 +78,26 @@ export default function SalonDashboardScreen() {
   // --- Map API data to display values ---
   const stats = useMemo(() => {
     if (isDemo || !generalCount) return MOCK_STATS;
+    const gc = generalCount as any;
     return {
-      todayRevenue: generalCount.todayRevenue ?? MOCK_STATS.todayRevenue,
-      weekRevenue: generalCount.weekRevenue ?? MOCK_STATS.weekRevenue,
-      todayAppointments: generalCount.todayAppointments ?? MOCK_STATS.todayAppointments,
-      completedToday: generalCount.completedToday ?? MOCK_STATS.completedToday,
-      cancelledToday: generalCount.cancelledToday ?? MOCK_STATS.cancelledToday,
-      activeStylists: generalCount.activeStylists ?? MOCK_STATS.activeStylists,
-      totalClients: generalCount.totalClients ?? MOCK_STATS.totalClients,
-      newClientsThisWeek: generalCount.newClientsThisWeek ?? MOCK_STATS.newClientsThisWeek,
+      todayRevenue: gc.todayRevenue ?? MOCK_STATS.todayRevenue,
+      weekRevenue: gc.weekRevenue ?? MOCK_STATS.weekRevenue,
+      todayAppointments: gc.todayAppointments ?? MOCK_STATS.todayAppointments,
+      completedToday: gc.completedToday ?? MOCK_STATS.completedToday,
+      cancelledToday: gc.cancelledToday ?? MOCK_STATS.cancelledToday,
+      activeStylists: gc.activeStylists ?? MOCK_STATS.activeStylists,
+      totalClients: gc.totalClients ?? MOCK_STATS.totalClients,
+      newClientsThisWeek: gc.newClientsThisWeek ?? MOCK_STATS.newClientsThisWeek,
     };
   }, [isDemo, generalCount]);
 
   const upcomingAppointments = useMemo(() => {
     if (isDemo || !appointmentsData) return MOCK_UPCOMING;
-    const list = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.appointments || [];
+    const list = Array.isArray(appointmentsData) ? appointmentsData : (appointmentsData as any)?.result || (appointmentsData as any)?.appointments || [];
     return list.slice(0, 5).map((apt: any) => ({
       id: apt._id || apt.id,
       client: typeof apt.user === 'object' ? apt.user?.name : 'Client',
-      service: typeof apt.mainService === 'object' ? apt.mainService?.title : (typeof apt.subService === 'object' ? apt.subService?.title : 'Service'),
+      service: typeof apt.mainService === 'object' ? apt.mainService?.title : (typeof (apt.subService || apt.subServices) === 'object' ? (apt.subService || apt.subServices)?.title : 'Service'),
       stylist: typeof apt.stylist === 'object' ? apt.stylist?.name : 'Stylist',
       time: apt.timeAsAString || '',
       duration: apt.mainService?.requiredTime ? `${apt.mainService.requiredTime} min` : '60 min',
@@ -106,7 +107,7 @@ export default function SalonDashboardScreen() {
 
   const staffList = useMemo(() => {
     if (isDemo || !stylistsData) return MOCK_STYLISTS;
-    const list = Array.isArray(stylistsData) ? stylistsData : stylistsData.users || stylistsData.stylists || [];
+    const list = Array.isArray(stylistsData) ? stylistsData : (stylistsData as any)?.result || (stylistsData as any)?.users || (stylistsData as any)?.stylists || [];
     return list.slice(0, 6).map((s: any) => ({
       id: s._id || s.id,
       name: s.name || 'Staff',
@@ -213,7 +214,7 @@ export default function SalonDashboardScreen() {
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
           </View>
-          {upcomingAppointments.map((apt) => (
+          {upcomingAppointments.map((apt: any) => (
             <View key={apt.id} style={styles.appointmentRow}>
               <View style={styles.appointmentTime}>
                 <Text style={styles.aptTimeText}>{apt.time}</Text>
@@ -242,7 +243,7 @@ export default function SalonDashboardScreen() {
               <Text style={styles.cardTitle}>Staff Activity</Text>
             </View>
           </View>
-          {staffList.map((stylist) => (
+          {staffList.map((stylist: any) => (
             <View key={stylist.id} style={styles.stylistRow}>
               <View style={styles.stylistAvatar}>
                 <Text style={styles.stylistInitial}>{stylist.name[0]}</Text>

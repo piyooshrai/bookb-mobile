@@ -60,9 +60,9 @@ export default function ProductDetail() {
     ? {
         id: apiProduct._id,
         name: apiProduct.productName,
-        brand: apiProduct.category?.categoryName || 'Brand',
+        brand: (apiProduct.category as any)?.categoryName || 'Brand',
         price: apiProduct.productPrice,
-        category: apiProduct.category?.categoryName || 'Treatment',
+        category: (apiProduct.category as any)?.categoryName || 'Treatment',
         rating: apiProduct.rating || 4.5,
         reviewCount: 0,
         description: apiProduct.productDescription || '',
@@ -71,8 +71,9 @@ export default function ProductDetail() {
       }
     : PRODUCT;
 
-  const similarProducts = !isDemo && apiSimilar
-    ? apiSimilar.map((p: any) => ({
+  const similarList = Array.isArray(apiSimilar) ? apiSimilar : (apiSimilar as any)?.result ?? [];
+  const similarProducts = !isDemo && similarList.length > 0
+    ? similarList.map((p: any) => ({
         id: p._id,
         name: p.productName,
         brand: p.category?.categoryName || 'Brand',

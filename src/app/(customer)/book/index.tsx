@@ -11,6 +11,16 @@ import { useServiceGroups } from '@/hooks/useServices';
 const STEPS = ['Service', 'Stylist', 'Time'];
 const ACTIVE_STEP = 0;
 
+interface DisplayService {
+  id: string;
+  name: string;
+  duration: string;
+  price: number;
+  description: string;
+  category: string;
+  mainServiceId: string;
+}
+
 const MOCK_SERVICES = [
   { id: '1', name: 'Haircut & Style', duration: '45 min', price: 65, description: 'Precision cut with wash and blowout finish', category: 'Hair' },
   { id: '2', name: 'Balayage', duration: '120 min', price: 185, description: 'Hand-painted highlights for a natural sun-kissed look', category: 'Color' },
@@ -29,7 +39,7 @@ export default function BookAppointment() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedService, setSelectedService] = useState<string | null>(null);
 
-  const displayServices = useMemo(() => {
+  const displayServices: DisplayService[] = useMemo(() => {
     if (!isDemo && serviceGroupsData) {
       const groups = Array.isArray(serviceGroupsData)
         ? serviceGroupsData

@@ -37,9 +37,12 @@ export default function MyDayScreen() {
   const { data: latestApt, isLoading: loadingLatest } = useStylistLatestAppointment();
   const { data: generalCount, isLoading: loadingGeneral } = useStylistGeneralCount();
 
+  // Normalize API data (may be wrapped in { result: [...] })
+  const dayAppts = Array.isArray(dayAppointments) ? dayAppointments : (dayAppointments as any)?.result ?? [];
+
   // Map API data to timeline format
-  const timeline = !isDemo && dayAppointments
-    ? dayAppointments.map((apt, i) => ({
+  const timeline = !isDemo && dayAppts.length > 0
+    ? dayAppts.map((apt: any, i: number) => ({
         id: apt.id || String(i),
         time: apt.startTime,
         client: apt.userName,
@@ -51,11 +54,11 @@ export default function MyDayScreen() {
     : MOCK_TIMELINE;
 
   // Build day stats from API or mock
-  const dayStats = !isDemo && dayAppointments
+  const dayStats = !isDemo && dayAppts.length > 0
     ? {
-        totalBookings: dayAppointments.length,
-        completed: dayAppointments.filter((a) => a.status === 'completed').length,
-        revenue: dayAppointments.filter((a) => a.status === 'completed').reduce((sum, a) => sum + (a.price || 0), 0),
+        totalBookings: dayAppts.length,
+        completed: dayAppts.filter((a: any) => a.status === 'completed').length,
+        revenue: dayAppts.filter((a: any) => a.status === 'completed').reduce((sum: number, a: any) => sum + (a.price || 0), 0),
         nextBreak: '--',
       }
     : !isDemo && generalCount
@@ -81,7 +84,7 @@ export default function MyDayScreen() {
       }
     : null;
 
-  const nextApt = nextAptFromApi || timeline.find((a) => a.status === 'in-progress') || timeline.find((a) => a.status === 'upcoming');
+  const nextApt = nextAptFromApi || timeline.find((a: any) => a.status === 'in-progress') || timeline.find((a: any) => a.status === 'upcoming');
 
   const isLoading = !isDemo && (loadingDay || loadingLatest || loadingGeneral);
 
@@ -139,7 +142,7 @@ export default function MyDayScreen() {
               <Text style={styles.cardTitle}>Today's Timeline</Text>
             </View>
           </View>
-          {timeline.map((apt, i) => (
+          {timeline.map((apt: any, i: number) => (
             <View key={apt.id} style={styles.tlRow}>
               <View style={styles.tlLeft}>
                 <View style={[styles.tlDot, apt.status === 'completed' && styles.dotDone, apt.status === 'in-progress' && styles.dotNow, apt.status === 'upcoming' && styles.dotNext]} />

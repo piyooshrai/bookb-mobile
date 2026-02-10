@@ -40,20 +40,30 @@ export default function ShopScreen() {
   const { data: apiProducts, isLoading: productsLoading } = useProductsForMobile();
   const { data: apiCategories, isLoading: categoriesLoading } = useProductCategories();
 
-  const mappedProducts = !isDemo && apiProducts
-    ? apiProducts.map((p: any) => ({
-        id: p._id,
-        name: p.productName,
-        brand: p.category?.categoryName || 'Brand',
-        price: p.productPrice,
-        category: p.category?.categoryName || 'Other',
-        initial: p.productName?.charAt(0) || '?',
-      }))
-    : MOCK_PRODUCTS;
+  const mappedProducts = (() => {
+    if (!isDemo && apiProducts) {
+      const list = Array.isArray(apiProducts) ? apiProducts : (apiProducts as any)?.result ?? [];
+      if (list.length > 0) {
+        return list.map((p: any) => ({
+          id: p._id,
+          name: p.productName,
+          brand: p.category?.categoryName || 'Brand',
+          price: p.productPrice,
+          category: p.category?.categoryName || 'Other',
+          initial: p.productName?.charAt(0) || '?',
+        }));
+      }
+    }
+    return MOCK_PRODUCTS;
+  })();
 
-  const categories = !isDemo && apiCategories
-    ? ['All', ...apiCategories.map((c: any) => c.categoryName)]
-    : CATEGORIES;
+  const categories = (() => {
+    if (!isDemo && apiCategories) {
+      const list = Array.isArray(apiCategories) ? apiCategories : (apiCategories as any)?.result ?? [];
+      if (list.length > 0) return ['All', ...list.map((c: any) => c.categoryName)];
+    }
+    return CATEGORIES;
+  })();
 
   const CART_ITEMS = !isDemo ? cartCount : 3;
   const CART_TOTAL = !isDemo ? cartTotal : 84.0;
@@ -134,7 +144,7 @@ export default function ShopScreen() {
               <ActivityIndicator size="small" color={colors.navy} />
             </View>
           )}
-          {filteredProducts.map((product) => {
+          {filteredProducts.map((product: any) => {
             const catColor = CATEGORY_COLORS[product.category] || colors.navy;
             return (
               <TouchableOpacity

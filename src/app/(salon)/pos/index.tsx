@@ -64,7 +64,7 @@ export default function PointOfSaleScreen() {
 
   const apiTransactions: Transaction[] = useMemo(() => {
     if (isDemo || !ordersData) return [];
-    const list = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
+    const list = Array.isArray(ordersData) ? ordersData : (ordersData as any)?.result || (ordersData as any)?.orders || (ordersData as any)?.data || [];
     return list.map((o: any) => ({
       id: o._id || o.id || o.orderId,
       client: typeof o.user === 'object' ? o.user?.name : 'Client',

@@ -99,29 +99,33 @@ export default function AppointmentDetail() {
   const deleteAppointmentMutation = useDeleteAppointment();
   const changeStatusMutation = useChangeAppointmentStatus();
 
-  const appointment = !isDemo && appointmentData
+  // Unwrap if data is wrapped in { result: ... } or is an array
+  const rawAppt = appointmentData && typeof appointmentData === 'object' && !('_id' in appointmentData) && (appointmentData as any)?.result
+    ? (Array.isArray((appointmentData as any).result) ? (appointmentData as any).result[0] : (appointmentData as any).result)
+    : appointmentData;
+  const appointment = !isDemo && rawAppt
     ? {
-        id: appointmentData._id,
-        status: mapApiStatus(appointmentData.status),
+        id: rawAppt._id,
+        status: mapApiStatus(rawAppt.status),
         service: {
-          name: getServiceTitle(appointmentData.subService) || getServiceTitle(appointmentData.mainService) || 'Service',
-          duration: appointmentData.requiredDuration ? formatDuration(appointmentData.requiredDuration) : '',
-          price: getServiceCharges(appointmentData.subService) || getServiceCharges(appointmentData.mainService) || 0,
+          name: getServiceTitle(rawAppt.subService) || getServiceTitle(rawAppt.mainService) || 'Service',
+          duration: rawAppt.requiredDuration ? formatDuration(rawAppt.requiredDuration) : '',
+          price: getServiceCharges(rawAppt.subService) || getServiceCharges(rawAppt.mainService) || 0,
         },
         stylist: {
-          name: getUserName(appointmentData.stylist) || 'Stylist',
-          initials: getInitials(getUserName(appointmentData.stylist)) || '--',
+          name: getUserName(rawAppt.stylist) || 'Stylist',
+          initials: getInitials(getUserName(rawAppt.stylist)) || '--',
           specialty: '',
         },
-        date: appointmentData.dateAsAString || '',
-        time: appointmentData.timeAsAString || '',
+        date: rawAppt.dateAsAString || '',
+        time: rawAppt.timeAsAString || '',
         salon: {
-          name: getUserName(appointmentData.salon) || '',
-          address: getUserAddress(appointmentData.salon),
+          name: getUserName(rawAppt.salon) || '',
+          address: getUserAddress(rawAppt.salon),
           city: '',
-          phone: getUserPhone(appointmentData.salon),
+          phone: getUserPhone(rawAppt.salon),
         },
-        notes: appointmentData.comment || '',
+        notes: rawAppt.comment || '',
       }
     : APPOINTMENT;
 

@@ -28,15 +28,23 @@ export default function BookingConfirmation() {
       return;
     }
 
-    const offset = new Date().getTimezoneOffset() * -1;
+    const offset = new Date().getTimezoneOffset();
     const durationMinutes = parseInt(params.serviceDuration?.replace(/\D/g, '') || '30', 10);
+
+    // Convert 12h time to HH:mm 24h for timeAsADate
+    const timeStr = params.time || '9:00 AM';
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    let hour24 = match ? parseInt(match[1]) : 9;
+    if (match && match[3].toUpperCase() === 'PM' && hour24 !== 12) hour24 += 12;
+    if (match && match[3].toUpperCase() === 'AM' && hour24 === 12) hour24 = 0;
+    const time24 = `${String(hour24).padStart(2, '0')}:${match ? match[2] : '00'}`;
 
     createAppointment.mutate(
       {
         data: {
           appointmentDate: params.dateForApi || '',
           timeData: {
-            timeAsADate: '',
+            timeAsADate: time24,
             timeAsAString: params.time || '',
             id: '',
           },

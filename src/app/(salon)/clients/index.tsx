@@ -56,7 +56,7 @@ export default function ClientListScreen() {
 
   const displayClients: Client[] = useMemo(() => {
     if (isDemo || !appointmentsData) return MOCK_CLIENTS;
-    const list = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.appointments || [];
+    const list = Array.isArray(appointmentsData) ? appointmentsData : (appointmentsData as any)?.result || (appointmentsData as any)?.appointments || [];
     if (list.length === 0) return MOCK_CLIENTS;
     // Deduplicate by user id
     const clientMap = new Map<string, { name: string; visits: number; spend: number; lastDate: string; phone: string }>();
@@ -66,7 +66,8 @@ export default function ClientListScreen() {
       const existing = clientMap.get(userId);
       const name = typeof apt.user === 'object' ? apt.user?.name : 'Client';
       const phone = typeof apt.user === 'object' ? (apt.user?.phone || '') : '';
-      const price = typeof apt.mainService === 'object' ? (apt.mainService?.charges ?? 0) : 0;
+      const svc = apt.mainService || apt.category;
+      const price = typeof svc === 'object' ? (svc?.charges ?? 0) : 0;
       const dateStr = apt.dateAsAString || '';
       if (existing) {
         existing.visits += 1;

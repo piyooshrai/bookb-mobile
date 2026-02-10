@@ -20,7 +20,10 @@ export const appointmentsApi = {
   },
 
   getFromDashboard: async (data: GetAppointmentsRequest) => {
-    const res = await apiClient.post<ApiResponse<Appointment[]>>('/appointment/get-appointment-from-dashboard', data);
+    const { offset, ...body } = data;
+    const res = await apiClient.post<ApiResponse<Appointment[]>>('/appointment/get-appointment-from-dashboard', body, {
+      params: { offset },
+    });
     return res.data;
   },
 

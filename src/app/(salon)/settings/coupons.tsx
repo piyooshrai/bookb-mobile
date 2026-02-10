@@ -45,7 +45,7 @@ export default function CouponsScreen() {
 
   const apiCoupons: Coupon[] = useMemo(() => {
     if (isDemo || !couponsData) return [];
-    const list = Array.isArray(couponsData) ? couponsData : couponsData.coupons || couponsData.data || [];
+    const list = Array.isArray(couponsData) ? couponsData : (couponsData as any).coupons || (couponsData as any).data || [];
     return list.map((c: any) => {
       const now = new Date();
       const expiryDate = c.expiry ? new Date(c.expiry) : null;
