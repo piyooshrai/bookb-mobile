@@ -35,7 +35,7 @@ export default function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
-      await authApi.forgotPassword({ email, phone, role: 'salon' });
+      await authApi.forgotPassword({ email, phone, role: '' });
       setSent(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Request failed';
