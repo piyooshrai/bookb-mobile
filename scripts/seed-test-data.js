@@ -593,8 +593,11 @@ async function createStylists() {
         intervalTime: stylist.intervalTime,
         recurringType: 'week',
       });
-      logResponse(`create-stylist:${stylist.name}`, res);
-      log('✅', `  Created stylist: ${stylist.name}`);
+      if (res.data?.status === false) {
+        log('ℹ️', `  Stylist ${stylist.name} already exists`);
+      } else {
+        log('✅', `  Created stylist: ${stylist.name}`);
+      }
     } catch (e) {
       log('⚠️', `  Stylist ${stylist.name}: ${e.response?.data?.message || e.message}`);
     }
@@ -622,9 +625,23 @@ async function createStylists() {
 async function createServices() {
   log('✂️', 'Creating service menu...');
 
+  // 1. Fetch existing main services to avoid duplicates
+  let existingMain = [];
+  try {
+    const res = await api.get('/service/get-enable-main-service');
+    if (Array.isArray(res.data?.data)) existingMain = res.data.data;
+  } catch (e) { /* empty */ }
+
+  const existingTitles = new Set(existingMain.map(s => s.title));
+
+  // 2. Create only missing main service categories
   for (const category of SERVICE_CATEGORIES) {
+    if (existingTitles.has(category.title)) {
+      log('ℹ️', `  Category already exists: ${category.title}`);
+      continue;
+    }
     try {
-      const mainRes = await api.post('/service/add-service', {
+      await api.post('/service/add-service', {
         title: category.title,
         description: category.description,
         charges: category.charges,
@@ -633,165 +650,94 @@ async function createServices() {
         breakTime: category.breakTime,
         isMainService: true,
       });
-      logResponse(`add-service:${category.title}`, mainRes);
-
-      const mainId = mainRes.data?.data?._id;
-      log('✅', `  Category: ${category.title} (ID: ${mainId || 'no ID returned'})`);
-
-      if (mainId && category.subServices) {
-        const subIds = [];
-        for (const sub of category.subServices) {
-          try {
-            const subRes = await api.post('/service/add-service', {
-              title: sub.title,
-              description: sub.description,
-              charges: sub.charges,
-              requiredTime: sub.requiredTime,
-              leadTime: sub.leadTime,
-              breakTime: sub.breakTime,
-              isMainService: false,
-              service: mainId,
-            });
-            const subId = subRes.data?.data?._id;
-            if (subId) {
-              subIds.push({ id: subId, title: sub.title, charges: sub.charges, requiredTime: sub.requiredTime });
-              subServiceFlatList.push({ id: subId, mainId, title: sub.title, charges: sub.charges, requiredTime: sub.requiredTime });
-            }
-            log('✅', `    - ${sub.title} ($${sub.charges}, ${sub.requiredTime}min)`);
-          } catch (e) {
-            log('⚠️', `    - ${sub.title}: ${e.response?.data?.message || e.message}`);
-          }
-          await sleep(200);
-        }
-        serviceIds.push({ mainId, subIds });
-      }
+      log('✅', `  Created category: ${category.title}`);
     } catch (e) {
       log('⚠️', `  ${category.title}: ${e.response?.data?.message || e.message}`);
     }
     await sleep(300);
   }
 
-  // If we didn't capture any sub-services, try fetching main services and creating subs
-  if (subServiceFlatList.length === 0) {
-    log('ℹ️', '  No sub-service IDs captured during creation, fetching main services...');
+  // 3. Re-fetch main services to get IDs (pick ONE per title, most recent)
+  let mainServices = [];
+  try {
+    const res = await api.get('/service/get-enable-main-service');
+    if (Array.isArray(res.data?.data)) mainServices = res.data.data;
+  } catch (e) { /* empty */ }
+  log('ℹ️', `  Found ${mainServices.length} main services total`);
 
-    // Try get-enable-main-service first (simpler)
-    let mainServices = [];
-    try {
-      const res = await api.get('/service/get-enable-main-service');
-      logResponse('get-enable-main-service', res);
-      if (Array.isArray(res.data?.data)) {
-        mainServices = res.data.data;
-      }
-    } catch (e) {
-      log('⚠️', '  get-enable-main-service failed, trying paginated...');
+  // Deduplicate: keep only the FIRST match per title (for our 4 categories)
+  const mainServiceMap = {}; // title -> { _id, title }
+  for (const svc of mainServices) {
+    if (!mainServiceMap[svc.title]) {
+      mainServiceMap[svc.title] = svc;
     }
-
-    // Fallback to paginated endpoint
-    if (mainServices.length === 0) {
-      try {
-        const res = await api.get('/service/get-main-service', {
-          params: { pageNumber: 1, pageSize: 50, filterValue: '' },
-        });
-        logResponse('get-main-service', res);
-        if (Array.isArray(res.data?.data?.result)) {
-          mainServices = res.data.data.result;
-        } else if (Array.isArray(res.data?.data)) {
-          mainServices = res.data.data;
-        }
-      } catch (e) {
-        log('⚠️', '  get-main-service failed: ' + (e.response?.data?.message || e.message));
-      }
-    }
-
-    log('ℹ️', `  Found ${mainServices.length} main services`);
-
-    // Now create sub-services for each main service
-    for (const mainSvc of mainServices) {
-      const mainId = mainSvc._id;
-      const categoryTitle = mainSvc.title;
-      const category = SERVICE_CATEGORIES.find(c => c.title === categoryTitle);
-      if (!category || !category.subServices) {
-        log('⚠️', `  No matching sub-services defined for "${categoryTitle}"`);
-        continue;
-      }
-
-      log('ℹ️', `  Creating sub-services for ${categoryTitle} (${mainId})...`);
-      for (const sub of category.subServices) {
-        try {
-          const subRes = await api.post('/service/add-service', {
-            title: sub.title,
-            description: sub.description,
-            charges: sub.charges,
-            requiredTime: sub.requiredTime,
-            leadTime: sub.leadTime,
-            breakTime: sub.breakTime,
-            isMainService: false,
-            service: mainId,
-          });
-          log('✅', `    - ${sub.title} ($${sub.charges}, ${sub.requiredTime}min)`);
-        } catch (e) {
-          log('⚠️', `    - ${sub.title}: ${e.response?.data?.message || e.message}`);
-        }
-        await sleep(200);
-      }
-    }
-
-    // Fetch sub-services via grouped endpoint
-    // Response format: { data: { result: [{ _id, category: { _id, title }, subService: [...] }] } }
-    try {
-      const res = await api.get('/service/get-service-groupby-category');
-      logResponse('get-services-grouped', res);
-      const groups = res.data?.data?.result || res.data?.data;
-      if (Array.isArray(groups)) {
-        for (const group of groups) {
-          const mainId = group.category?._id || group.mainService?._id || group._id;
-          const subs = group.subService || group.subServices || group.services || [];
-          if (Array.isArray(subs)) {
-            for (const sub of subs) {
-              subServiceFlatList.push({
-                id: sub._id,
-                mainId,
-                title: sub.title,
-                charges: sub.charges,
-                requiredTime: sub.requiredTime,
-              });
-            }
-          }
-        }
-      }
-    } catch (e) {
-      log('⚠️', '  get-service-groupby-category failed: ' + (e.response?.data?.message || e.message));
-    }
-
-    // Fallback: fetch sub-services per main service individually
-    if (subServiceFlatList.length === 0) {
-      for (const mainSvc of mainServices) {
-        try {
-          const res = await api.get('/service/get-enable-sub-service', {
-            params: { mainServiceId: mainSvc._id },
-          });
-          logResponse(`get-sub-service:${mainSvc.title}`, res);
-          const subs = res.data?.data?.result || res.data?.data;
-          if (Array.isArray(subs)) {
-            for (const sub of subs) {
-              subServiceFlatList.push({
-                id: sub._id,
-                mainId: mainSvc._id,
-                title: sub.title,
-                charges: sub.charges,
-                requiredTime: sub.requiredTime,
-              });
-            }
-          }
-        } catch (e) {
-          // silent
-        }
-      }
-    }
-
-    log('✅', `  Total sub-services available: ${subServiceFlatList.length}`);
   }
+
+  // 4. For each of our categories, check if sub-services exist; create if not
+  for (const category of SERVICE_CATEGORIES) {
+    const mainSvc = mainServiceMap[category.title];
+    if (!mainSvc) {
+      log('⚠️', `  No main service found for "${category.title}"`);
+      continue;
+    }
+    const mainId = mainSvc._id;
+
+    // Check if this main service already has sub-services
+    let existingSubs = [];
+    try {
+      const res = await api.get('/service/get-enable-sub-service', { params: { mainServiceId: mainId } });
+      if (Array.isArray(res.data?.data)) existingSubs = res.data.data;
+    } catch (e) { /* empty */ }
+
+    if (existingSubs.length > 0) {
+      log('ℹ️', `  ${category.title} already has ${existingSubs.length} sub-services, skipping creation`);
+      for (const sub of existingSubs) {
+        subServiceFlatList.push({
+          id: sub._id, mainId, title: sub.title, charges: sub.charges, requiredTime: sub.requiredTime,
+        });
+      }
+      continue;
+    }
+
+    log('ℹ️', `  Creating sub-services for ${category.title} (${mainId})...`);
+    for (const sub of category.subServices) {
+      try {
+        await api.post('/service/add-service', {
+          title: sub.title,
+          description: sub.description,
+          charges: sub.charges,
+          requiredTime: sub.requiredTime,
+          leadTime: sub.leadTime,
+          breakTime: sub.breakTime,
+          isMainService: false,
+          service: mainId,
+        });
+        log('✅', `    - ${sub.title} ($${sub.charges}, ${sub.requiredTime}min)`);
+      } catch (e) {
+        log('⚠️', `    - ${sub.title}: ${e.response?.data?.message || e.message}`);
+      }
+      await sleep(200);
+    }
+  }
+
+  // 5. Fetch all sub-services for our 4 categories to build subServiceFlatList
+  if (subServiceFlatList.length === 0) {
+    for (const category of SERVICE_CATEGORIES) {
+      const mainSvc = mainServiceMap[category.title];
+      if (!mainSvc) continue;
+      try {
+        const res = await api.get('/service/get-enable-sub-service', { params: { mainServiceId: mainSvc._id } });
+        const subs = res.data?.data || [];
+        for (const sub of subs) {
+          subServiceFlatList.push({
+            id: sub._id, mainId: mainSvc._id, title: sub.title, charges: sub.charges, requiredTime: sub.requiredTime,
+          });
+        }
+      } catch (e) { /* skip */ }
+    }
+  }
+
+  log('✅', `  Total sub-services available: ${subServiceFlatList.length}`);
 }
 
 // ─── Step 4: Create Products ─────────────────────────────────────────────────
@@ -799,52 +745,68 @@ async function createServices() {
 async function createProducts() {
   log('🛍️', 'Creating product catalog...');
 
-  // Create categories first
+  // Fetch existing categories to avoid duplicates
+  let existingCats = [];
+  try {
+    const res = await api.get('/product/get-enabled-category');
+    if (Array.isArray(res.data?.data)) existingCats = res.data.data;
+  } catch (e) { /* empty */ }
+
+  const existingCatNames = new Set(existingCats.map(c => c.categoryName));
+  for (const cat of existingCats) {
+    categoryMap[cat.categoryName] = cat._id;
+  }
+
+  // Create only missing categories
   for (const cat of PRODUCT_CATEGORIES) {
+    if (existingCatNames.has(cat.categoryName)) {
+      log('ℹ️', `  Category already exists: ${cat.categoryName}`);
+      continue;
+    }
     try {
-      const res = await api.post('/product/create-category', {
-        categoryName: cat.categoryName,
-      });
-      logResponse(`create-category:${cat.categoryName}`, res);
-      const catId = res.data?.data?._id;
-      if (catId) categoryMap[cat.categoryName] = catId;
-      log('✅', `  Category: ${cat.categoryName} (ID: ${catId || 'no ID returned'})`);
+      await api.post('/product/create-category', { categoryName: cat.categoryName });
+      log('✅', `  Created category: ${cat.categoryName}`);
     } catch (e) {
       log('⚠️', `  Category ${cat.categoryName}: ${e.response?.data?.message || e.message}`);
     }
     await sleep(200);
   }
 
-  // Always try to fetch categories to fill in missing IDs
+  // Re-fetch to fill in any missing IDs
   if (Object.keys(categoryMap).length < PRODUCT_CATEGORIES.length) {
-    log('ℹ️', `  Only ${Object.keys(categoryMap).length}/${PRODUCT_CATEGORIES.length} category IDs captured, fetching...`);
     try {
       const res = await api.get('/product/get-enabled-category');
-      logResponse('get-enabled-category', res);
       const cats = res.data?.data;
       if (Array.isArray(cats)) {
         for (const cat of cats) {
-          if (cat._id && cat.categoryName) {
-            categoryMap[cat.categoryName] = cat._id;
-          }
+          if (cat._id && cat.categoryName) categoryMap[cat.categoryName] = cat._id;
         }
       }
-      log('✅', `  Category map now has ${Object.keys(categoryMap).length} entries: ${Object.keys(categoryMap).join(', ')}`);
-    } catch (e) {
-      log('⚠️', '  Could not fetch categories: ' + (e.response?.data?.message || e.message));
-    }
+    } catch (e) { /* empty */ }
   }
+  log('✅', `  Category map: ${Object.keys(categoryMap).join(', ')}`);
 
-  // Create products (use JSON, not FormData)
+  // Check existing products to avoid duplicates
+  let existingProducts = new Set();
+  try {
+    const res = await api.get('/product/get-product-by-salon', { params: { pageNumber: 1, pageSize: 100, filterValue: '' } });
+    const prods = res.data?.data?.result || [];
+    for (const p of prods) existingProducts.add(p.productName);
+  } catch (e) { /* empty */ }
+
+  // Create only missing products
   for (const product of PRODUCTS) {
     const catId = categoryMap[product.category];
     if (!catId) {
       log('⚠️', `  Skipping ${product.productName} (no category ID for "${product.category}")`);
       continue;
     }
-
+    if (existingProducts.has(product.productName)) {
+      log('ℹ️', `  Product already exists: ${product.productName}`);
+      continue;
+    }
     try {
-      const res = await api.post('/product/add-product', {
+      await api.post('/product/add-product', {
         productName: product.productName,
         productDescription: product.productDescription,
         productPrice: product.productPrice,
@@ -867,7 +829,21 @@ async function createProducts() {
 async function createClients() {
   log('👥', 'Creating client accounts...');
 
+  // Check existing clients
+  let existingEmails = new Set();
+  try {
+    const res = await api.get('/users/get-user', { params: { pageNumber: 1, pageSize: 50, filterValue: '' } });
+    const result = res.data?.data?.result || [];
+    for (const u of result) {
+      if (u.role === 'user') existingEmails.add(u.email);
+    }
+  } catch (e) { /* empty */ }
+
   for (const client of CLIENTS) {
+    if (existingEmails.has(client.email)) {
+      log('ℹ️', `  Already exists: ${client.name} (${client.email})`);
+      continue;
+    }
     try {
       const res = await api.post('/users/user-signup', {
         name: client.name,
@@ -880,7 +856,11 @@ async function createClients() {
         active: true,
         password: 'BookB2026!',
       });
-      log('✅', `  ${client.name} (${client.email})`);
+      if (res.data?.status === false) {
+        log('ℹ️', `  ${client.name}: ${res.data?.message}`);
+      } else {
+        log('✅', `  ${client.name} (${client.email})`);
+      }
     } catch (e) {
       log('⚠️', `  ${client.name}: ${e.response?.data?.message || e.message}`);
     }
@@ -890,7 +870,6 @@ async function createClients() {
   // Fetch users to get their IDs
   try {
     const res = await api.get('/users/get-user', { params: { pageNumber: 1, pageSize: 50, filterValue: '' } });
-    logResponse('get-users', res);
     const result = res.data?.data?.result || res.data?.data;
     if (Array.isArray(result)) {
       clientUserIds = result
