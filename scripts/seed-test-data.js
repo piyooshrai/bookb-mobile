@@ -204,8 +204,17 @@ function log(emoji, msg) {
   console.log(emoji + '  ' + msg);
 }
 
+// Returns YYYY-MM-DD (for appointment API)
 function formatDate(date) {
   return date.toISOString().split('T')[0];
+}
+
+// Returns MM/DD/YYYY (for availability - matches backend moment().format('MM/DD/YYYY'))
+function formatDateMMDDYYYY(date) {
+  var m = String(date.getMonth() + 1).padStart(2, '0');
+  var d = String(date.getDate()).padStart(2, '0');
+  var y = date.getFullYear();
+  return m + '/' + d + '/' + y;
 }
 
 function getDateString(date) {
@@ -907,48 +916,141 @@ async function createClients() {
 async function setupAvailability() {
   log('[AVAILABILITY]', 'Setting up availability for next 2 weeks...');
 
+  // IMPORTANT: day names must be 3-letter title-case ("Mon","Tue","Wed") to match
+  // moment().format('ddd') used in event/appointment.event.js:655-656
   var businessHours = {
     slots: [
-      { day: 'Monday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Tuesday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Wednesday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Thursday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Friday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Saturday', slot: [{ startTime: '09:00', endTime: '17:00' }] },
-      { day: 'Sunday', slot: [] },
+      { day: 'Mon', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Tue', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Wed', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Thu', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Fri', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'Sat', slot: [{ startTime: '9:00 AM', endTime: '5:00 PM' }] },
     ],
-    recurringType: 'week',
   };
 
   for (var i = 0; i < stylistIds.length; i++) {
     var stylist = stylistIds[i];
     try {
-      await api.post('/appointment-availability/create-availability-bulk', businessHours, {
+      var bulkRes = await api.post('/appointment-availability/create-availability-bulk', businessHours, {
         params: { offset: OFFSET, stylistId: stylist.id },
       });
-      log('[OK]', '  Availability set for ' + stylist.name);
+      logResponse('bulk-availability:' + stylist.name, bulkRes);
+      log('[OK]', '  Bulk availability set for ' + stylist.name);
     } catch (e) {
-      log('[WARN]', '  ' + stylist.name + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+      log('[WARN]', '  Bulk ' + stylist.name + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
 
-    // Also create day-by-day availability for the next 14 days
+    // Create day-by-day availability for the next 14 days
     var today = new Date();
+    var dayOk = 0;
+    var dayFail = 0;
     for (var d = 0; d < 14; d++) {
       var date = new Date(today);
       date.setDate(today.getDate() + d);
       if (date.getDay() === 0) continue; // Skip Sundays
 
       try {
-        await api.post('/appointment-availability/create-availability-day',
-          { date: formatDate(date) },
+        var dayRes = await api.post('/appointment-availability/create-availability-day',
+          { date: formatDateMMDDYYYY(date) },
           { params: { offset: OFFSET, stylistId: stylist.id } }
         );
+        if (dayRes.data && dayRes.data.status === false) {
+          dayFail++;
+        } else {
+          dayOk++;
+        }
+        // Log first response for debugging
+        if (d === 0) {
+          logResponse('day-availability:' + formatDateMMDDYYYY(date), dayRes);
+        }
       } catch (e) {
-        // Silently continue - may already exist
+        dayFail++;
+        if (d === 0) {
+          log('[WARN]', '  Day avail error: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+        }
       }
       await sleep(100);
     }
+    log('[INFO]', '  Day availability for ' + stylist.name + ': ' + dayOk + ' ok, ' + dayFail + ' failed');
     await sleep(300);
+  }
+
+  // IMPORTANT: create-availability-bulk fires an async event that processes in background.
+  // We must wait for the backend to finish creating all availability records before
+  // attempting to create appointments. Without this wait, early dates will fail.
+  log('[AVAILABILITY]', '  Waiting 15 seconds for async availability processing to complete...');
+  await sleep(15000);
+
+  // Verify availability was created by checking a sample date
+  if (stylistIds.length > 0) {
+    var checkDate = new Date();
+    checkDate.setDate(checkDate.getDate() + 7); // check a date 1 week from now
+    if (checkDate.getDay() === 0) checkDate.setDate(checkDate.getDate() + 1);
+    try {
+      var checkRes = await api.get('/appointment-availability/get-appointment-list-with-block-unblock-status', {
+        params: { date: formatDate(checkDate), offset: OFFSET, stylistId: stylistIds[0].id },
+      });
+      var checkData = checkRes.data && checkRes.data.data;
+      var slotCount = Array.isArray(checkData) ? checkData.length : 0;
+      log('[AVAILABILITY]', '  Verification: ' + slotCount + ' slots found for ' + formatDate(checkDate) + ' (' + stylistIds[0].name + ')');
+      if (slotCount === 0) {
+        log('[WARN]', '  No slots found yet - waiting 10 more seconds...');
+        await sleep(10000);
+      }
+    } catch (e) {
+      log('[WARN]', '  Verification failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+  }
+
+  // --- DIAGNOSTIC: Check what availability actually exists ---
+  log('[DIAGNOSTIC]', 'Checking availability after creation...');
+  if (stylistIds.length > 0) {
+    var firstStylist = stylistIds[0];
+
+    // Check business hours
+    try {
+      var bhRes = await api.get('/appointment-availability/get-buiness-hours', {
+        params: { stylistId: firstStylist.id },
+      });
+      log('[DIAGNOSTIC]', '  Business hours for ' + firstStylist.name + ': ' + JSON.stringify(bhRes.data).substring(0, 500));
+    } catch (e) {
+      log('[DIAGNOSTIC]', '  Business hours query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+
+    // Check mobile availability for tomorrow
+    var tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (tomorrow.getDay() === 0) tomorrow.setDate(tomorrow.getDate() + 1); // skip Sunday
+    var tomorrowStr = formatDate(tomorrow);
+    try {
+      var mobileRes = await api.get('/appointment-availability/get-availability-by-stylist-for-mobile', {
+        params: { date: tomorrowStr },
+      });
+      log('[DIAGNOSTIC]', '  Mobile availability for ' + tomorrowStr + ': ' + JSON.stringify(mobileRes.data).substring(0, 500));
+    } catch (e) {
+      log('[DIAGNOSTIC]', '  Mobile availability query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+
+    // Check availability by salon
+    try {
+      var salonAvailRes = await api.get('/appointment-availability/get-availability-by-salon', {
+        params: { pageNumber: 1, pageSize: 5, filterValue: '' },
+      });
+      log('[DIAGNOSTIC]', '  Salon availability: ' + JSON.stringify(salonAvailRes.data).substring(0, 500));
+    } catch (e) {
+      log('[DIAGNOSTIC]', '  Salon availability query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
+
+    // Check block status for tomorrow
+    try {
+      var blockRes = await api.get('/appointment-availability/get-appointment-list-with-block-unblock-status', {
+        params: { date: tomorrowStr, offset: OFFSET, stylistId: firstStylist.id },
+      });
+      log('[DIAGNOSTIC]', '  Block status for ' + tomorrowStr + ': ' + JSON.stringify(blockRes.data).substring(0, 500));
+    } catch (e) {
+      log('[DIAGNOSTIC]', '  Block status query failed: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+    }
   }
 }
 
@@ -1038,11 +1140,12 @@ async function createAppointments() {
         if (timeParts[3].toUpperCase() === 'AM' && hour === 12) hour = 0;
         var time24 = String(hour).padStart(2, '0') + ':' + timeParts[2];
 
-        // Match the mobile app salon flow: timeAsADate = current ISO timestamp
+        // timeAsADate must be HH:mm 24hr string matching availability slots
+        // (backend check-availability-of-time.js queries timeData.timeAsADate against "09:00" etc.)
         var aptRes = await api.post('/appointment/add-appointment-from-dashboard', {
           appointmentDate: appointmentDate,
           timeData: {
-            timeAsADate: new Date().toISOString(),
+            timeAsADate: time24,
             timeAsAString: time,
             id: '',
           },
