@@ -31,7 +31,7 @@ const OFFSET = new Date().getTimezoneOffset();
 const SALON_OWNER = {
   name: 'Sophia Chen',
   salonName: 'Luxe',
-  email: 'sophia.chen@luxemiami.com',
+  email: 'sophia.chen@bookb.app',
   password: 'BookB2026!',
   phone: '3055550147',
   countryCode: '+1',
