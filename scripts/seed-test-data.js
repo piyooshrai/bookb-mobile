@@ -240,6 +240,8 @@ function extractToken(data) {
 }
 
 function extractUserId(data) {
+  if (data?.userid) return data.userid;
+  if (data?.userId) return data.userId;
   if (data?.data?.userid) return data.data.userid;
   if (data?.data?.userId) return data.data.userId;
   if (data?.data?._id) return data.data._id;
@@ -472,31 +474,120 @@ async function createServices() {
     await sleep(300);
   }
 
-  // If we didn't capture any sub-services, try fetching them
+  // If we didn't capture any sub-services, try fetching main services and creating subs
   if (subServiceFlatList.length === 0) {
-    log('ℹ️', '  No sub-service IDs captured during creation, fetching from API...');
+    log('ℹ️', '  No sub-service IDs captured during creation, fetching main services...');
+
+    // Try get-enable-main-service first (simpler)
+    let mainServices = [];
     try {
-      const res = await api.get('/service/get-service-groupby-category');
-      logResponse('get-services-grouped', res);
-      if (res.data?.data) {
-        for (const group of res.data.data) {
-          const mainId = group.mainService?._id || group._id;
-          const subs = group.subServices || group.services || [];
-          for (const sub of subs) {
+      const res = await api.get('/service/get-enable-main-service');
+      logResponse('get-enable-main-service', res);
+      if (Array.isArray(res.data?.data)) {
+        mainServices = res.data.data;
+      }
+    } catch (e) {
+      log('⚠️', '  get-enable-main-service failed, trying paginated...');
+    }
+
+    // Fallback to paginated endpoint
+    if (mainServices.length === 0) {
+      try {
+        const res = await api.get('/service/get-main-service', {
+          params: { pageNumber: 1, pageSize: 50, filterValue: '' },
+        });
+        logResponse('get-main-service', res);
+        if (Array.isArray(res.data?.data?.result)) {
+          mainServices = res.data.data.result;
+        } else if (Array.isArray(res.data?.data)) {
+          mainServices = res.data.data;
+        }
+      } catch (e) {
+        log('⚠️', '  get-main-service failed: ' + (e.response?.data?.message || e.message));
+      }
+    }
+
+    log('ℹ️', `  Found ${mainServices.length} main services`);
+
+    // Now create sub-services for each main service
+    for (const mainSvc of mainServices) {
+      const mainId = mainSvc._id;
+      const categoryTitle = mainSvc.title;
+      const category = SERVICE_CATEGORIES.find(c => c.title === categoryTitle);
+      if (!category || !category.subServices) {
+        log('⚠️', `  No matching sub-services defined for "${categoryTitle}"`);
+        continue;
+      }
+
+      log('ℹ️', `  Creating sub-services for ${categoryTitle} (${mainId})...`);
+      for (const sub of category.subServices) {
+        try {
+          const subRes = await api.post('/service/add-service', {
+            title: sub.title,
+            description: sub.description,
+            charges: sub.charges,
+            requiredTime: sub.requiredTime,
+            leadTime: sub.leadTime,
+            breakTime: sub.breakTime,
+            isMainService: false,
+            service: mainId,
+          });
+          log('✅', `    - ${sub.title} ($${sub.charges}, ${sub.requiredTime}min)`);
+        } catch (e) {
+          log('⚠️', `    - ${sub.title}: ${e.response?.data?.message || e.message}`);
+        }
+        await sleep(200);
+      }
+    }
+
+    // Now fetch sub-services for each main service
+    for (const mainSvc of mainServices) {
+      try {
+        const res = await api.get('/service/get-enable-sub-service', {
+          params: { mainServiceId: mainSvc._id },
+        });
+        if (Array.isArray(res.data?.data)) {
+          for (const sub of res.data.data) {
             subServiceFlatList.push({
               id: sub._id,
-              mainId,
+              mainId: mainSvc._id,
               title: sub.title,
               charges: sub.charges,
               requiredTime: sub.requiredTime,
             });
           }
         }
-        log('✅', `  Fetched ${subServiceFlatList.length} services from API`);
+      } catch (e) {
+        // silent
       }
-    } catch (e) {
-      log('❌', '  Could not fetch services: ' + (e.response?.data?.message || e.message));
     }
+
+    // Also try the grouped endpoint one more time
+    if (subServiceFlatList.length === 0) {
+      try {
+        const res = await api.get('/service/get-service-groupby-category');
+        logResponse('get-services-grouped-retry', res);
+        if (res.data?.data) {
+          for (const group of res.data.data) {
+            const mainId = group.mainService?._id || group._id;
+            const subs = group.subServices || group.services || [];
+            for (const sub of subs) {
+              subServiceFlatList.push({
+                id: sub._id,
+                mainId,
+                title: sub.title,
+                charges: sub.charges,
+                requiredTime: sub.requiredTime,
+              });
+            }
+          }
+        }
+      } catch (e) {
+        // silent
+      }
+    }
+
+    log('✅', `  Total sub-services available: ${subServiceFlatList.length}`);
   }
 }
 
