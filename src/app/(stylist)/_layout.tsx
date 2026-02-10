@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect, Line, Circle, Polyline } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
@@ -14,11 +15,12 @@ function TabIcon({ children, focused }: { children: React.ReactNode; focused: bo
 }
 
 export default function StylistLayout() {
+  const insets = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom + 6, height: 56 + insets.bottom }],
         tabBarActiveTintColor: colors.navy,
         tabBarInactiveTintColor: '#a39e96',
         tabBarLabelStyle: styles.tabLabel,
@@ -144,9 +146,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTop: 10,
-    paddingBottom: 30,
-    height: 80,
+    paddingTop: 8,
   },
   tabLabel: {
     fontFamily: fontFamilies.bodyMedium,
