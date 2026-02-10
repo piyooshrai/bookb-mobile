@@ -540,37 +540,17 @@ async function createServices() {
       }
     }
 
-    // Now fetch sub-services for each main service
-    for (const mainSvc of mainServices) {
-      try {
-        const res = await api.get('/service/get-enable-sub-service', {
-          params: { mainServiceId: mainSvc._id },
-        });
-        if (Array.isArray(res.data?.data)) {
-          for (const sub of res.data.data) {
-            subServiceFlatList.push({
-              id: sub._id,
-              mainId: mainSvc._id,
-              title: sub.title,
-              charges: sub.charges,
-              requiredTime: sub.requiredTime,
-            });
-          }
-        }
-      } catch (e) {
-        // silent
-      }
-    }
-
-    // Also try the grouped endpoint one more time
-    if (subServiceFlatList.length === 0) {
-      try {
-        const res = await api.get('/service/get-service-groupby-category');
-        logResponse('get-services-grouped-retry', res);
-        if (res.data?.data) {
-          for (const group of res.data.data) {
-            const mainId = group.mainService?._id || group._id;
-            const subs = group.subServices || group.services || [];
+    // Fetch sub-services via grouped endpoint
+    // Response format: { data: { result: [{ _id, category: { _id, title }, subService: [...] }] } }
+    try {
+      const res = await api.get('/service/get-service-groupby-category');
+      logResponse('get-services-grouped', res);
+      const groups = res.data?.data?.result || res.data?.data;
+      if (Array.isArray(groups)) {
+        for (const group of groups) {
+          const mainId = group.category?._id || group.mainService?._id || group._id;
+          const subs = group.subService || group.subServices || group.services || [];
+          if (Array.isArray(subs)) {
             for (const sub of subs) {
               subServiceFlatList.push({
                 id: sub._id,
@@ -582,8 +562,34 @@ async function createServices() {
             }
           }
         }
-      } catch (e) {
-        // silent
+      }
+    } catch (e) {
+      log('⚠️', '  get-service-groupby-category failed: ' + (e.response?.data?.message || e.message));
+    }
+
+    // Fallback: fetch sub-services per main service individually
+    if (subServiceFlatList.length === 0) {
+      for (const mainSvc of mainServices) {
+        try {
+          const res = await api.get('/service/get-enable-sub-service', {
+            params: { mainServiceId: mainSvc._id },
+          });
+          logResponse(`get-sub-service:${mainSvc.title}`, res);
+          const subs = res.data?.data?.result || res.data?.data;
+          if (Array.isArray(subs)) {
+            for (const sub of subs) {
+              subServiceFlatList.push({
+                id: sub._id,
+                mainId: mainSvc._id,
+                title: sub.title,
+                charges: sub.charges,
+                requiredTime: sub.requiredTime,
+              });
+            }
+          }
+        } catch (e) {
+          // silent
+        }
       }
     }
 
@@ -760,11 +766,13 @@ async function createAppointments() {
     log('⚠️', '  No services found. Trying to fetch existing services...');
     try {
       const res = await api.get('/service/get-service-groupby-category');
-      if (res.data?.data) {
-        for (const group of res.data.data) {
-          const mainId = group.mainService?._id;
-          if (mainId && group.subServices) {
-            for (const sub of group.subServices) {
+      const groups = res.data?.data?.result || res.data?.data;
+      if (Array.isArray(groups)) {
+        for (const group of groups) {
+          const mainId = group.category?._id || group.mainService?._id || group._id;
+          const subs = group.subService || group.subServices || [];
+          if (mainId && Array.isArray(subs)) {
+            for (const sub of subs) {
               subServiceFlatList.push({
                 id: sub._id,
                 mainId,
