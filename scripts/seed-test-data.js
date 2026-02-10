@@ -907,47 +907,63 @@ async function createClients() {
 async function setupAvailability() {
   log('[AVAILABILITY]', 'Setting up availability for next 2 weeks...');
 
+  // IMPORTANT: day names MUST be lowercase, times MUST be 12-hour AM/PM format
+  // (matching what the mobile app sends in src/app/(salon)/settings/hours.tsx)
   var businessHours = {
     slots: [
-      { day: 'Monday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Tuesday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Wednesday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Thursday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Friday', slot: [{ startTime: '09:00', endTime: '18:00' }] },
-      { day: 'Saturday', slot: [{ startTime: '09:00', endTime: '17:00' }] },
-      { day: 'Sunday', slot: [] },
+      { day: 'monday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'tuesday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'wednesday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'thursday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'friday', slot: [{ startTime: '9:00 AM', endTime: '6:00 PM' }] },
+      { day: 'saturday', slot: [{ startTime: '9:00 AM', endTime: '5:00 PM' }] },
     ],
-    recurringType: 'week',
   };
 
   for (var i = 0; i < stylistIds.length; i++) {
     var stylist = stylistIds[i];
     try {
-      await api.post('/appointment-availability/create-availability-bulk', businessHours, {
+      var bulkRes = await api.post('/appointment-availability/create-availability-bulk', businessHours, {
         params: { offset: OFFSET, stylistId: stylist.id },
       });
-      log('[OK]', '  Availability set for ' + stylist.name);
+      logResponse('bulk-availability:' + stylist.name, bulkRes);
+      log('[OK]', '  Bulk availability set for ' + stylist.name);
     } catch (e) {
-      log('[WARN]', '  ' + stylist.name + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+      log('[WARN]', '  Bulk ' + stylist.name + ': ' + ((e.response && e.response.data && e.response.data.message) || e.message));
     }
 
-    // Also create day-by-day availability for the next 14 days
+    // Create day-by-day availability for the next 14 days
     var today = new Date();
+    var dayOk = 0;
+    var dayFail = 0;
     for (var d = 0; d < 14; d++) {
       var date = new Date(today);
       date.setDate(today.getDate() + d);
       if (date.getDay() === 0) continue; // Skip Sundays
 
       try {
-        await api.post('/appointment-availability/create-availability-day',
+        var dayRes = await api.post('/appointment-availability/create-availability-day',
           { date: formatDate(date) },
           { params: { offset: OFFSET, stylistId: stylist.id } }
         );
+        if (dayRes.data && dayRes.data.status === false) {
+          dayFail++;
+        } else {
+          dayOk++;
+        }
+        // Log first response for debugging
+        if (d === 0) {
+          logResponse('day-availability:' + formatDate(date), dayRes);
+        }
       } catch (e) {
-        // Silently continue - may already exist
+        dayFail++;
+        if (d === 0) {
+          log('[WARN]', '  Day avail error: ' + ((e.response && e.response.data && e.response.data.message) || e.message));
+        }
       }
       await sleep(100);
     }
+    log('[INFO]', '  Day availability for ' + stylist.name + ': ' + dayOk + ' ok, ' + dayFail + ' failed');
     await sleep(300);
   }
 }
