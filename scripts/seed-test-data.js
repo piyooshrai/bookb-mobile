@@ -24,7 +24,7 @@
 
 const axios = require('axios');
 
-const API_BASE = 'https://api.bookb.app/api/v1';
+const API_BASE = 'https://bookb.the-algo.com/api/v1';
 const OFFSET = new Date().getTimezoneOffset();
 
 // ─── Credentials ────────────────────────────────────────────────────────────

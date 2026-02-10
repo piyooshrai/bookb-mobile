@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useAppStore } from '@/stores/appStore';
 import { AppointmentRequestEvent, OnlineUsersEvent, RewardEvent } from '@/api/types';
 
-const SOCKET_URL = 'https://api.bookb.app';
+const SOCKET_URL = 'https://bookb.the-algo.com';
 
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);

@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { ApiResponse } from './types';
 
-const API_BASE_URL = 'https://api.bookb.app/api/v1';
+const API_BASE_URL = 'https://bookb.the-algo.com/api/v1';
 
 const TOKEN_KEY = 'bookb_auth_token';
 
