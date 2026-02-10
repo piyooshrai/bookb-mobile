@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useAuthStore } from '@/stores/authStore';
+import { useAppStore } from '@/stores/appStore';
 
 interface CartItem {
   id: string;
@@ -22,16 +24,40 @@ const INITIAL_CART: CartItem[] = [
 
 export default function CartScreen() {
   const router = useRouter();
-  const [cart, setCart] = useState(INITIAL_CART);
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const storeCart = useAppStore((s) => s.cart);
+  const updateCartQuantity = useAppStore((s) => s.updateCartQuantity);
+  const storeCartTotal = useAppStore((s) => s.getCartTotal());
+  const storeCartCount = useAppStore((s) => s.getCartCount());
+
+  // Demo mode: local state with INITIAL_CART
+  const [demoCart, setDemoCart] = useState(INITIAL_CART);
 
   const updateQty = (id: string, delta: number) => {
-    setCart((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item)).filter((item) => item.quantity > 0),
-    );
+    if (!isDemo) {
+      const item = storeCart.find((c) => c.productId === id);
+      if (item) {
+        updateCartQuantity(id, item.quantity + delta);
+      }
+    } else {
+      setDemoCart((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item)).filter((item) => item.quantity > 0),
+      );
+    }
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cart: CartItem[] = !isDemo
+    ? storeCart.map((c) => ({
+        id: c.productId,
+        name: c.name,
+        brand: '',
+        price: c.price,
+        quantity: c.quantity,
+      }))
+    : demoCart;
+
+  const subtotal = !isDemo ? storeCartTotal : cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const itemCount = !isDemo ? storeCartCount : cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

@@ -1,6 +1,9 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Line, Rect, Polyline } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useAdminCoupons } from '@/hooks/useCoupons';
+import { Coupon } from '@/api/types';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -80,29 +83,68 @@ const MOCK_EXPIRED_COUPONS = [
   },
 ];
 
-const totalActiveUsage = MOCK_ACTIVE_COUPONS.reduce((sum, c) => sum + c.usageCount, 0);
+const MOCK_TOTAL_ACTIVE_USAGE = MOCK_ACTIVE_COUPONS.reduce((sum, c) => sum + c.usageCount, 0);
 
 export default function AdminCoupons() {
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const { data: adminCouponsData, isLoading } = useAdminCoupons();
+
+  // Map API coupon data to display format (separate active vs expired)
+  const apiCoupons = !isDemo && adminCouponsData && Array.isArray(adminCouponsData)
+    ? adminCouponsData.map((coupon: Coupon) => ({
+        id: coupon._id,
+        code: coupon.code || 'UNKNOWN',
+        discount: parseInt(coupon.discount, 10) || 0,
+        type: coupon.discount?.includes('%') || !coupon.discount?.includes('$') ? ('percentage' as const) : ('fixed' as const),
+        usageCount: 0, // API Coupon type doesn't include usage tracking
+        usageLimit: null as number | null,
+        expiryDate: coupon.expireDate
+          ? new Date(coupon.expireDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : 'No expiry',
+        description: coupon.description || coupon.title || '',
+        isExpired: coupon.isExpired ?? false,
+        enable: coupon.enable ?? true,
+      }))
+    : null;
+
+  const activeCoupons = apiCoupons
+    ? apiCoupons.filter((c) => !c.isExpired && c.enable)
+    : MOCK_ACTIVE_COUPONS;
+
+  const expiredCoupons = apiCoupons
+    ? apiCoupons.filter((c) => c.isExpired || !c.enable)
+    : MOCK_EXPIRED_COUPONS;
+
+  const totalActiveUsage = apiCoupons
+    ? activeCoupons.reduce((sum, c) => sum + c.usageCount, 0)
+    : MOCK_TOTAL_ACTIVE_USAGE;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Coupons</Text>
         <Text style={styles.subtitle}>
-          {MOCK_ACTIVE_COUPONS.length} active · {MOCK_EXPIRED_COUPONS.length} expired · {totalActiveUsage.toLocaleString()} total redemptions
+          {activeCoupons.length} active · {expiredCoupons.length} expired · {totalActiveUsage.toLocaleString()} total redemptions
         </Text>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        {!isDemo && isLoading ? (
+          <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.gold} />
+          </View>
+        ) : (
+          <>
         {/* Active Coupons Section */}
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
             <View style={styles.activeDot} />
             <Text style={styles.sectionTitle}>Active Coupons</Text>
           </View>
-          <Text style={styles.sectionCount}>{MOCK_ACTIVE_COUPONS.length}</Text>
+          <Text style={styles.sectionCount}>{activeCoupons.length}</Text>
         </View>
 
-        {MOCK_ACTIVE_COUPONS.map((coupon) => {
+        {activeCoupons.map((coupon) => {
           const usagePercent = coupon.usageLimit
             ? Math.round((coupon.usageCount / coupon.usageLimit) * 100)
             : null;
@@ -181,10 +223,10 @@ export default function AdminCoupons() {
             <View style={styles.expiredDot} />
             <Text style={styles.sectionTitle}>Expired</Text>
           </View>
-          <Text style={styles.sectionCount}>{MOCK_EXPIRED_COUPONS.length}</Text>
+          <Text style={styles.sectionCount}>{expiredCoupons.length}</Text>
         </View>
 
-        {MOCK_EXPIRED_COUPONS.map((coupon) => (
+        {expiredCoupons.map((coupon) => (
           <View key={coupon.id} style={styles.expiredCard}>
             <View style={styles.cardTop}>
               <View style={styles.codeContainer}>
@@ -218,6 +260,8 @@ export default function AdminCoupons() {
         ))}
 
         <View style={{ height: 20 }} />
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

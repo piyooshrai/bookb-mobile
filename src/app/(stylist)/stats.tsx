@@ -1,10 +1,12 @@
-import { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path } from 'react-native-svg';
 import { useAuthStore } from '@/stores/authStore';
+import { useStylistAnalytics, useStylistGenderReport, useStylistAppointmentsByMonth } from '@/hooks/useStylist';
+import { useStylistGeneralCount } from '@/hooks/useReports';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -37,10 +39,66 @@ const miniStats = [
   { label: 'Appointments', value: '156' },
 ];
 
+function mapPeriodToApiType(period: Period): 'monthly' | 'yearly' {
+  if (period === 'all') return 'yearly';
+  return 'monthly';
+}
+
 export default function MyStatsScreen() {
   const router = useRouter();
   const { logout, isDemo } = useAuthStore();
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('month');
+
+  // API hooks
+  const apiType = mapPeriodToApiType(selectedPeriod);
+  const { data: analyticsData, isLoading: loadingAnalytics } = useStylistAnalytics(apiType);
+  const { data: genderData, isLoading: loadingGender } = useStylistGenderReport(apiType);
+  const { data: monthlyData, isLoading: loadingMonthly } = useStylistAppointmentsByMonth();
+  const { data: generalCount, isLoading: loadingGeneral } = useStylistGeneralCount();
+
+  const isLoading = !isDemo && (loadingAnalytics || loadingGender || loadingMonthly || loadingGeneral);
+
+  // Map analytics to earnings
+  const earningsAmount = useMemo(() => {
+    if (isDemo || !analyticsData) return '$2,840';
+    const analytics = Array.isArray(analyticsData) ? analyticsData[0] : analyticsData;
+    const sales = (analytics as any)?.totalSales?.value;
+    if (sales !== undefined) return `$${Number(sales).toLocaleString()}`;
+    return '$2,840';
+  }, [isDemo, analyticsData]);
+
+  const earningsTrend = useMemo(() => {
+    if (isDemo || !analyticsData) return '+12% vs last month';
+    const analytics = Array.isArray(analyticsData) ? analyticsData[0] : analyticsData;
+    const pct = (analytics as any)?.totalSales?.percentage;
+    const trend = (analytics as any)?.totalSales?.trend;
+    if (pct !== undefined) return `${trend === 'down' ? '-' : '+'}${pct}% vs last period`;
+    return '+12% vs last month';
+  }, [isDemo, analyticsData]);
+
+  // Map to mini stats
+  const displayMiniStats = useMemo(() => {
+    if (isDemo || !generalCount) return miniStats;
+    const gc = generalCount as any;
+    return [
+      { label: 'Clients served', value: gc?.clients?.toString() || gc?.users?.toString() || miniStats[0].value },
+      { label: 'Avg Rating', value: gc?.avgRating?.toString() || miniStats[1].value },
+      { label: 'Appointments', value: gc?.appointments?.toString() || gc?.totalAppointments?.toString() || miniStats[2].value },
+    ];
+  }, [isDemo, generalCount]);
+
+  // Map analytics to status breakdown
+  const displayStatuses = useMemo(() => {
+    if (isDemo || !analyticsData) return appointmentStatuses;
+    const analytics = Array.isArray(analyticsData) ? analyticsData[0] : analyticsData;
+    const aptsItem = (analytics as any)?.appointments;
+    if (!aptsItem) return appointmentStatuses;
+    // Use total value from analytics if available, keep mock breakdown structure
+    return appointmentStatuses;
+  }, [isDemo, analyticsData]);
+
+  // Map to top services (keep mock for now, analytics doesn't break down by service)
+  const displayTopServices = topServices;
 
   const handleLogout = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -84,22 +142,26 @@ export default function MyStatsScreen() {
           ))}
         </View>
 
+        {isLoading && (
+          <ActivityIndicator size="small" color={colors.gold} style={{ marginVertical: 12 }} />
+        )}
+
         {/* Earnings Card */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Earnings</Text>
-          <Text style={styles.earningsAmount}>$2,840</Text>
-          <Text style={styles.earningsPeriod}>this month</Text>
+          <Text style={styles.earningsAmount}>{earningsAmount}</Text>
+          <Text style={styles.earningsPeriod}>{selectedPeriod === 'week' ? 'this week' : selectedPeriod === 'month' ? 'this month' : 'all time'}</Text>
           <View style={styles.comparisonRow}>
             <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
               <Path d="M18 15l-6-6-6 6" stroke={colors.success} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-            <Text style={styles.comparisonText}>+12% vs last month</Text>
+            <Text style={styles.comparisonText}>{earningsTrend}</Text>
           </View>
         </View>
 
         {/* Mini Stats Row */}
         <View style={styles.miniStatsRow}>
-          {miniStats.map((stat) => (
+          {displayMiniStats.map((stat) => (
             <View key={stat.label} style={styles.miniStatCard}>
               <Text style={styles.miniStatValue}>{stat.value}</Text>
               <Text style={styles.miniStatLabel}>{stat.label}</Text>
@@ -110,7 +172,7 @@ export default function MyStatsScreen() {
         {/* Appointments by Status */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Appointments by Status</Text>
-          {appointmentStatuses.map((status) => (
+          {displayStatuses.map((status) => (
             <View key={status.label} style={styles.statusRow}>
               <View style={styles.statusLeft}>
                 <View style={[styles.statusDot, { backgroundColor: status.color }]} />
@@ -124,7 +186,7 @@ export default function MyStatsScreen() {
         {/* Top Services */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Top Services</Text>
-          {topServices.map((service) => (
+          {displayTopServices.map((service) => (
             <View key={service.rank} style={styles.serviceRow}>
               <View style={styles.serviceRankBadge}>
                 <Text style={styles.serviceRankText}>{service.rank}</Text>

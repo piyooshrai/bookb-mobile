@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect, Polygon } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -70,6 +71,7 @@ const MOCK_PRODUCTS: Product[] = [
 export default function ClientDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const isDemo = useAuthStore((s) => s.isDemo);
   const client = MOCK_CLIENT;
   const [clientNotes, setClientNotes] = useState(client.notes);
 
@@ -222,7 +224,7 @@ export default function ClientDetailScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.bookButton} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.bookButton} activeOpacity={0.8} onPress={() => router.push('/(salon)/schedule/new')}>
             <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
               <Rect x={3} y={4} width={18} height={18} rx={2} stroke={colors.textWhite} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               <Line x1={16} y1={2} x2={16} y2={6} stroke={colors.textWhite} strokeWidth={1.8} strokeLinecap="round" />

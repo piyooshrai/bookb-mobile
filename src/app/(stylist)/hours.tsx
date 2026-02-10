@@ -1,6 +1,9 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useBusinessHours, useCreateBulkAvailability } from '@/hooks/useAvailability';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -27,7 +30,57 @@ const MOCK_HOURS: DaySchedule[] = [
 const THIS_WEEK_HOURS = 41.25;
 const NEXT_WEEK_HOURS = 39.5;
 
+const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const SHORT_DAYS: Record<string, string> = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' };
+
+function mapBusinessHoursToSchedule(slots: { day: string; slot: { startTime: string; endTime: string }[] }[]): DaySchedule[] {
+  const slotMap = new Map(slots.map((s) => [s.day, s]));
+
+  return ALL_DAYS.map((day) => {
+    const entry = slotMap.get(day);
+    const hasSlots = entry && entry.slot && entry.slot.length > 0;
+    const firstSlot = hasSlots ? entry!.slot[0] : null;
+    const lastSlot = hasSlots ? entry!.slot[entry!.slot.length - 1] : null;
+
+    return {
+      day,
+      shortDay: SHORT_DAYS[day] || day.slice(0, 3),
+      isOn: !!hasSlots,
+      start: firstSlot ? firstSlot.startTime : '--',
+      end: lastSlot ? lastSlot.endTime : '--',
+      lunchStart: '--',
+      lunchEnd: '--',
+    };
+  });
+}
+
 export default function MyAvailabilityScreen() {
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const stylistId = useAuthStore((s) => s.stylistId);
+
+  // API hooks
+  const { data: businessHoursData, isLoading } = useBusinessHours(!isDemo ? (stylistId || undefined) : undefined);
+  const createBulk = useCreateBulkAvailability();
+
+  // Map API data to display format
+  const hours: DaySchedule[] = useMemo(() => {
+    if (isDemo || !businessHoursData) return MOCK_HOURS;
+    const bh = businessHoursData as any;
+    const slots = bh?.slots || bh?.data?.slots;
+    if (!slots || !Array.isArray(slots)) return MOCK_HOURS;
+    return mapBusinessHoursToSchedule(slots);
+  }, [isDemo, businessHoursData]);
+
+  const workingDays = hours.filter((d) => d.isOn).length;
+  const daysOff = hours.length - workingDays;
+
+  // Compute total weekly hours and averages from the hours data
+  const totalMinutes = hours
+    .filter((d) => d.isOn && d.start !== '--' && d.end !== '--')
+    .reduce((sum, d) => sum + getDurationMinutes(d.start, d.end), 0);
+  const thisWeekHours = !isDemo && businessHoursData ? +(totalMinutes / 60).toFixed(2) : THIS_WEEK_HOURS;
+  const avgPerDay = workingDays > 0 ? +(thisWeekHours / workingDays).toFixed(2) : 0;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -36,6 +89,10 @@ export default function MyAvailabilityScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+        {!isDemo && isLoading && (
+          <ActivityIndicator size="small" color={colors.gold} style={{ marginVertical: 12 }} />
+        )}
+
         {/* Summary Stats */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
@@ -46,7 +103,7 @@ export default function MyAvailabilityScreen() {
                 <Line x1={12} y1={12} x2={16} y2={14} stroke={colors.gold} strokeWidth={1.8} strokeLinecap="round" />
               </Svg>
             </View>
-            <Text style={styles.statValue}>{THIS_WEEK_HOURS}h</Text>
+            <Text style={styles.statValue}>{thisWeekHours}h</Text>
             <Text style={styles.statLabel}>This Week</Text>
           </View>
           <View style={styles.statCard}>
@@ -58,7 +115,7 @@ export default function MyAvailabilityScreen() {
                 <Line x1={3} y1={10} x2={21} y2={10} stroke={colors.gold} strokeWidth={1.8} strokeLinecap="round" />
               </Svg>
             </View>
-            <Text style={styles.statValue}>{NEXT_WEEK_HOURS}h</Text>
+            <Text style={styles.statValue}>{isDemo ? NEXT_WEEK_HOURS : thisWeekHours}h</Text>
             <Text style={styles.statLabel}>Next Week</Text>
           </View>
         </View>
@@ -75,7 +132,7 @@ export default function MyAvailabilityScreen() {
             <Text style={styles.cardTitle}>Weekly Hours</Text>
           </View>
 
-          {MOCK_HOURS.map((day, i) => (
+          {hours.map((day, i) => (
             <View key={day.day}>
               <View style={styles.dayRow}>
                 {/* Toggle indicator */}
@@ -97,7 +154,7 @@ export default function MyAvailabilityScreen() {
                   )}
                 </View>
               </View>
-              {i < MOCK_HOURS.length - 1 && <View style={styles.dayDivider} />}
+              {i < hours.length - 1 && <View style={styles.dayDivider} />}
             </View>
           ))}
         </View>
@@ -115,14 +172,14 @@ export default function MyAvailabilityScreen() {
             <Text style={styles.cardTitle}>Lunch Break</Text>
           </View>
 
-          {MOCK_HOURS.filter((d) => d.isOn).map((day, i, arr) => (
+          {hours.filter((d) => d.isOn).map((day, i, arr) => (
             <View key={day.day}>
               <View style={styles.lunchRow}>
                 <Text style={styles.lunchDay}>{day.shortDay}</Text>
                 <Text style={styles.lunchTime}>{day.lunchStart} - {day.lunchEnd}</Text>
                 <View style={styles.lunchDuration}>
                   <Text style={styles.lunchDurationText}>
-                    {getDurationMinutes(day.lunchStart, day.lunchEnd)} min
+                    {day.lunchStart !== '--' && day.lunchEnd !== '--' ? `${getDurationMinutes(day.lunchStart, day.lunchEnd)} min` : '--'}
                   </Text>
                 </View>
               </View>
@@ -142,17 +199,17 @@ export default function MyAvailabilityScreen() {
           </View>
           <View style={styles.overviewGrid}>
             <View style={styles.overviewItem}>
-              <Text style={styles.overviewValue}>5</Text>
+              <Text style={styles.overviewValue}>{workingDays}</Text>
               <Text style={styles.overviewLabel}>Working Days</Text>
             </View>
             <View style={styles.overviewDivider} />
             <View style={styles.overviewItem}>
-              <Text style={styles.overviewValue}>2</Text>
+              <Text style={styles.overviewValue}>{daysOff}</Text>
               <Text style={styles.overviewLabel}>Days Off</Text>
             </View>
             <View style={styles.overviewDivider} />
             <View style={styles.overviewItem}>
-              <Text style={styles.overviewValue}>8.25h</Text>
+              <Text style={styles.overviewValue}>{avgPerDay}h</Text>
               <Text style={styles.overviewLabel}>Avg / Day</Text>
             </View>
           </View>

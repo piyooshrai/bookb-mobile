@@ -1,6 +1,10 @@
-import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useSalonList, useEnableDisableSalon } from '@/hooks/useSalon';
+import { User } from '@/api/types';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -98,7 +102,57 @@ const getStatusStyle = (status: string) => {
 };
 
 export default function SalonList() {
-  const activeSalons = MOCK_SALONS.filter((s) => s.status === 'active').length;
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const [searchText, setSearchText] = useState('');
+
+  const { data: salonListData, isLoading } = useSalonList({
+    pageNumber: 1,
+    pageSize: 50,
+    filterValue: searchText || undefined,
+  });
+
+  const enableDisableMutation = useEnableDisableSalon();
+
+  // Map API salon data to display format
+  const salons = !isDemo && salonListData?.result
+    ? salonListData.result.map((user: User) => ({
+        id: user._id,
+        name: user.name || 'Unknown Salon',
+        location: user.address || 'No location',
+        plan: user.subscription?.[0]?.plan || 'Starter',
+        status: user.active ? ('active' as const) : ('suspended' as const),
+        stylists: user.stylistCount || 0,
+        joinDate: user.createdAt
+          ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : 'N/A',
+      }))
+    : MOCK_SALONS;
+
+  const activeSalons = salons.filter((s) => s.status === 'active').length;
+
+  const handleToggleSalonStatus = useCallback((salonId: string, currentlyActive: boolean) => {
+    const action = currentlyActive ? 'suspend' : 'enable';
+    Alert.alert(
+      `${currentlyActive ? 'Suspend' : 'Enable'} Salon`,
+      `Are you sure you want to ${action} this salon?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: currentlyActive ? 'destructive' : 'default',
+          onPress: () => {
+            enableDisableMutation.mutate(
+              { userID: salonId, enable: !currentlyActive },
+              {
+                onSuccess: () => Alert.alert('Success', `Salon ${action}d successfully.`),
+                onError: () => Alert.alert('Error', `Failed to ${action} salon. Please try again.`),
+              },
+            );
+          },
+        },
+      ],
+    );
+  }, [enableDisableMutation]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -106,10 +160,10 @@ export default function SalonList() {
         <View style={styles.headerTopRow}>
           <Text style={styles.title}>Salons</Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>{MOCK_SALONS.length} total</Text>
+            <Text style={styles.countBadgeText}>{salons.length} total</Text>
           </View>
         </View>
-        <Text style={styles.subtitle}>{activeSalons} active · {MOCK_SALONS.length - activeSalons} suspended</Text>
+        <Text style={styles.subtitle}>{activeSalons} active · {salons.length - activeSalons} suspended</Text>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
@@ -124,70 +178,83 @@ export default function SalonList() {
             placeholder="Search salons by name or location..."
             placeholderTextColor={colors.textTertiary}
             editable={true}
+            value={searchText}
+            onChangeText={setSearchText}
           />
         </View>
 
         {/* Salon Cards */}
-        {MOCK_SALONS.map((salon) => {
-          const planStyle = getPlanStyle(salon.plan);
-          const statusStyle = getStatusStyle(salon.status);
-          return (
-            <View key={salon.id} style={styles.card}>
-              <View style={styles.cardTop}>
-                <View style={styles.salonAvatar}>
-                  <Text style={styles.salonInitial}>{salon.name[0]}</Text>
-                </View>
-                <View style={styles.salonMain}>
-                  <Text style={styles.salonName}>{salon.name}</Text>
-                  <View style={styles.locationRow}>
-                    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
-                      <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                      <Circle cx={12} cy={10} r={3} stroke={colors.textTertiary} strokeWidth={2} />
-                    </Svg>
-                    <Text style={styles.salonLocation}>{salon.location}</Text>
+        {!isDemo && isLoading ? (
+          <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.gold} />
+          </View>
+        ) : (
+          salons.map((salon) => {
+            const planStyle = getPlanStyle(salon.plan);
+            const statusStyle = getStatusStyle(salon.status);
+            return (
+              <TouchableOpacity
+                key={salon.id}
+                style={styles.card}
+                activeOpacity={0.7}
+                onLongPress={() => !isDemo && handleToggleSalonStatus(salon.id, salon.status === 'active')}
+              >
+                <View style={styles.cardTop}>
+                  <View style={styles.salonAvatar}>
+                    <Text style={styles.salonInitial}>{salon.name[0]}</Text>
+                  </View>
+                  <View style={styles.salonMain}>
+                    <Text style={styles.salonName}>{salon.name}</Text>
+                    <View style={styles.locationRow}>
+                      <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+                        <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke={colors.textTertiary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                        <Circle cx={12} cy={10} r={3} stroke={colors.textTertiary} strokeWidth={2} />
+                      </Svg>
+                      <Text style={styles.salonLocation}>{salon.location}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                    <View style={[styles.statusDot, { backgroundColor: statusStyle.text }]} />
+                    <Text style={[styles.statusText, { color: statusStyle.text }]}>
+                      {salon.status.charAt(0).toUpperCase() + salon.status.slice(1)}
+                    </Text>
                   </View>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-                  <View style={[styles.statusDot, { backgroundColor: statusStyle.text }]} />
-                  <Text style={[styles.statusText, { color: statusStyle.text }]}>
-                    {salon.status.charAt(0).toUpperCase() + salon.status.slice(1)}
-                  </Text>
-                </View>
-              </View>
 
-              <View style={styles.cardDivider} />
+                <View style={styles.cardDivider} />
 
-              <View style={styles.cardBottom}>
-                <View style={styles.metaItem}>
-                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                    <Rect x={2} y={7} width={20} height={14} rx={2} stroke={colors.textSecondary} strokeWidth={1.8} />
-                    <Path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
-                  </Svg>
-                  <Text style={styles.metaText}>{salon.plan}</Text>
-                  <View style={[styles.planDot, { backgroundColor: planStyle.text }]} />
+                <View style={styles.cardBottom}>
+                  <View style={styles.metaItem}>
+                    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                      <Rect x={2} y={7} width={20} height={14} rx={2} stroke={colors.textSecondary} strokeWidth={1.8} />
+                      <Path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
+                    </Svg>
+                    <Text style={styles.metaText}>{salon.plan}</Text>
+                    <View style={[styles.planDot, { backgroundColor: planStyle.text }]} />
+                  </View>
+                  <View style={styles.metaItem}>
+                    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                      <Path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                      <Circle cx={8.5} cy={7} r={4} stroke={colors.textSecondary} strokeWidth={1.8} />
+                      <Path d="M20 8v6" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
+                      <Path d="M23 11h-6" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
+                    </Svg>
+                    <Text style={styles.metaText}>{salon.stylists} stylists</Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                      <Rect x={3} y={4} width={18} height={18} rx={2} stroke={colors.textSecondary} strokeWidth={1.8} />
+                      <Line x1={16} y1={2} x2={16} y2={6} stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
+                      <Line x1={8} y1={2} x2={8} y2={6} stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
+                      <Line x1={3} y1={10} x2={21} y2={10} stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
+                    </Svg>
+                    <Text style={styles.metaText}>{salon.joinDate}</Text>
+                  </View>
                 </View>
-                <View style={styles.metaItem}>
-                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                    <Path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                    <Circle cx={8.5} cy={7} r={4} stroke={colors.textSecondary} strokeWidth={1.8} />
-                    <Path d="M20 8v6" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
-                    <Path d="M23 11h-6" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
-                  </Svg>
-                  <Text style={styles.metaText}>{salon.stylists} stylists</Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                    <Rect x={3} y={4} width={18} height={18} rx={2} stroke={colors.textSecondary} strokeWidth={1.8} />
-                    <Line x1={16} y1={2} x2={16} y2={6} stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
-                    <Line x1={8} y1={2} x2={8} y2={6} stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
-                    <Line x1={3} y1={10} x2={21} y2={10} stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" />
-                  </Svg>
-                  <Text style={styles.metaText}>{salon.joinDate}</Text>
-                </View>
-              </View>
-            </View>
-          );
-        })}
+              </TouchableOpacity>
+            );
+          })
+        )}
 
         <View style={{ height: 20 }} />
       </ScrollView>

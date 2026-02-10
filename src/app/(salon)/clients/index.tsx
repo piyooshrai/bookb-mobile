@@ -1,6 +1,10 @@
-import { View, Text, StyleSheet, ScrollView, TextInput } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useDashboardAppointments } from '@/hooks/useAppointments';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -35,6 +39,57 @@ const MOCK_CLIENTS: Client[] = [
 // ---------------------------------------------------------------------------
 
 export default function ClientListScreen() {
+  const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const salonId = useAuthStore((s) => s.salonId);
+  const [searchText, setSearchText] = useState('');
+
+  // Derive clients from appointments data (no dedicated salon-scoped user list hook)
+  const offset = new Date().getTimezoneOffset();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: appointmentsData, isLoading } = useDashboardAppointments(
+    { salon: salonId || '', fromDate: thirtyDaysAgo, toDate: today, offset },
+    !isDemo && !!salonId,
+  );
+
+  const displayClients: Client[] = useMemo(() => {
+    if (isDemo || !appointmentsData) return MOCK_CLIENTS;
+    const list = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.appointments || [];
+    if (list.length === 0) return MOCK_CLIENTS;
+    // Deduplicate by user id
+    const clientMap = new Map<string, { name: string; visits: number; spend: number; lastDate: string; phone: string }>();
+    list.forEach((apt: any) => {
+      const userId = typeof apt.user === 'object' ? apt.user?._id : apt.user;
+      if (!userId) return;
+      const existing = clientMap.get(userId);
+      const name = typeof apt.user === 'object' ? apt.user?.name : 'Client';
+      const phone = typeof apt.user === 'object' ? (apt.user?.phone || '') : '';
+      const price = typeof apt.mainService === 'object' ? (apt.mainService?.charges ?? 0) : 0;
+      const dateStr = apt.dateAsAString || '';
+      if (existing) {
+        existing.visits += 1;
+        existing.spend += price;
+        if (dateStr > existing.lastDate) existing.lastDate = dateStr;
+      } else {
+        clientMap.set(userId, { name, visits: 1, spend: price, lastDate: dateStr, phone });
+      }
+    });
+    return Array.from(clientMap.entries()).map(([id, c]) => ({
+      id,
+      name: c.name,
+      lastVisit: c.lastDate ? new Date(c.lastDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+      totalVisits: c.visits,
+      totalSpend: c.spend,
+      phone: c.phone,
+    }));
+  }, [isDemo, appointmentsData]);
+
+  const filteredClients = searchText
+    ? displayClients.filter((c) => c.name.toLowerCase().includes(searchText.toLowerCase()) || c.phone.includes(searchText))
+    : displayClients;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -42,7 +97,7 @@ export default function ClientListScreen() {
         <View style={styles.headerRow}>
           <Text style={styles.title}>Clients</Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countText}>{MOCK_CLIENTS.length}</Text>
+            <Text style={styles.countText}>{displayClients.length}</Text>
           </View>
         </View>
         <Text style={styles.subtitle}>Manage your client relationships</Text>
@@ -60,12 +115,19 @@ export default function ClientListScreen() {
             placeholder="Search clients by name or phone..."
             placeholderTextColor={colors.textTertiary}
             editable={true}
+            value={searchText}
+            onChangeText={setSearchText}
           />
         </View>
 
         {/* Client list */}
-        {MOCK_CLIENTS.map((client) => (
-          <View key={client.id} style={styles.card}>
+        {!isDemo && isLoading && (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <ActivityIndicator size="small" color={colors.gold} />
+          </View>
+        )}
+        {filteredClients.map((client) => (
+          <TouchableOpacity key={client.id} style={styles.card} activeOpacity={0.7} onPress={() => router.push(`/(salon)/clients/${client.id}`)}>
             <View style={styles.cardRow}>
               {/* Avatar */}
               <View style={styles.avatar}>
@@ -112,7 +174,7 @@ export default function ClientListScreen() {
                 <Text style={styles.statValue}>{client.phone}</Text>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
 
         <View style={styles.bottomSpacer} />

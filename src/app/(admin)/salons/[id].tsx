@@ -1,18 +1,22 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useSalonList, useEnableDisableSalon, useDeleteSalon } from '@/hooks/useSalon';
+import { User } from '@/api/types';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
-const salonStats = [
+const MOCK_SALON_STATS = [
   { label: 'Stylists', value: '4' },
   { label: 'Appts/month', value: '284' },
   { label: 'Monthly Rev', value: '$8,420' },
   { label: 'Clients', value: '312' },
 ];
 
-const performanceMetrics = [
+const MOCK_PERFORMANCE_METRICS = [
   { label: 'Conversion Rate', value: '73%' },
   { label: 'Retention Rate', value: '78%' },
   { label: 'Avg Ticket', value: '$89' },
@@ -21,6 +25,90 @@ const performanceMetrics = [
 export default function SalonDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+
+  // Fetch salon list and find the specific salon by id
+  const { data: salonListData, isLoading } = useSalonList({
+    pageNumber: 1,
+    pageSize: 50,
+  });
+
+  const enableDisableMutation = useEnableDisableSalon();
+  const deleteMutation = useDeleteSalon();
+
+  // Find the specific salon from the list
+  const apiSalon = !isDemo && salonListData?.result
+    ? salonListData.result.find((u: User) => u._id === id)
+    : null;
+
+  // Map API data to display values (fallback to mock data)
+  const salonName = apiSalon?.name || 'Luxe Hair Studio';
+  const salonLocation = apiSalon?.address || '142 West 57th St, New York';
+  const isActive = apiSalon ? apiSalon.active : true;
+  const joinedDate = apiSalon?.createdAt
+    ? `Joined ${new Date(apiSalon.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
+    : 'Joined Jan 2024';
+  const planName = apiSalon?.subscription?.[0]?.plan || 'Professional';
+  const ownerName = apiSalon?.name || 'John Mitchell';
+  const ownerEmail = apiSalon?.email || 'john@luxehairstudio.com';
+  const ownerPhone = apiSalon?.phone || '(212) 555-0142';
+
+  const salonStats = apiSalon
+    ? [
+        { label: 'Stylists', value: String(apiSalon.stylistCount || 0) },
+        { label: 'Appts/month', value: MOCK_SALON_STATS[1].value },
+        { label: 'Monthly Rev', value: MOCK_SALON_STATS[2].value },
+        { label: 'Clients', value: MOCK_SALON_STATS[3].value },
+      ]
+    : MOCK_SALON_STATS;
+
+  const performanceMetrics = MOCK_PERFORMANCE_METRICS;
+
+  const handleSuspendToggle = useCallback(() => {
+    if (isDemo || !apiSalon) return;
+    const action = isActive ? 'suspend' : 'enable';
+    Alert.alert(
+      `${isActive ? 'Suspend' : 'Enable'} Salon`,
+      `Are you sure you want to ${action} ${salonName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: isActive ? 'destructive' : 'default',
+          onPress: () => {
+            enableDisableMutation.mutate(
+              { userID: apiSalon._id, enable: !isActive },
+              {
+                onSuccess: () => Alert.alert('Success', `Salon ${action}d successfully.`),
+                onError: () => Alert.alert('Error', `Failed to ${action} salon. Please try again.`),
+              },
+            );
+          },
+        },
+      ],
+    );
+  }, [isDemo, apiSalon, isActive, salonName, enableDisableMutation]);
+
+  if (!isDemo && isLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton} activeOpacity={0.7}>
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                <Path d="M19 12H5" stroke={colors.textWhite} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M12 19l-7-7 7-7" stroke={colors.textWhite} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </TouchableOpacity>
+            <Text style={styles.title}>Salon Detail</Text>
+          </View>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.gold} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -46,16 +134,16 @@ export default function SalonDetail() {
               </Svg>
             </View>
             <View style={styles.salonHeaderInfo}>
-              <Text style={styles.salonName}>Luxe Hair Studio</Text>
-              <Text style={styles.salonLocation}>142 West 57th St, New York</Text>
+              <Text style={styles.salonName}>{salonName}</Text>
+              <Text style={styles.salonLocation}>{salonLocation}</Text>
             </View>
           </View>
           <View style={styles.salonMetaRow}>
-            <View style={styles.statusBadge}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusText}>Active</Text>
+            <View style={[styles.statusBadge, !isActive && { backgroundColor: colors.errorLight }]}>
+              <View style={[styles.statusDot, !isActive && { backgroundColor: colors.error }]} />
+              <Text style={[styles.statusText, !isActive && { color: colors.errorDark }]}>{isActive ? 'Active' : 'Suspended'}</Text>
             </View>
-            <Text style={styles.joinedText}>Joined Jan 2024</Text>
+            <Text style={styles.joinedText}>{joinedDate}</Text>
           </View>
         </View>
 
@@ -64,7 +152,7 @@ export default function SalonDetail() {
           <View style={styles.planHeaderRow}>
             <Text style={styles.cardTitle}>Subscription Plan</Text>
             <View style={styles.planBadge}>
-              <Text style={styles.planBadgeText}>Professional</Text>
+              <Text style={styles.planBadgeText}>{planName}</Text>
             </View>
           </View>
           <View style={styles.planDetailRow}>
@@ -104,20 +192,20 @@ export default function SalonDetail() {
               <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-            <Text style={styles.ownerValue}>John Mitchell</Text>
+            <Text style={styles.ownerValue}>{ownerName}</Text>
           </View>
           <View style={styles.ownerRow}>
             <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
               <Path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M22 6l-10 7L2 6" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-            <Text style={styles.ownerValue}>john@luxehairstudio.com</Text>
+            <Text style={styles.ownerValue}>{ownerEmail}</Text>
           </View>
           <View style={styles.ownerRow}>
             <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
               <Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" stroke={colors.textSecondary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-            <Text style={styles.ownerValue}>(212) 555-0142</Text>
+            <Text style={styles.ownerValue}>{ownerPhone}</Text>
           </View>
         </View>
 
@@ -148,12 +236,12 @@ export default function SalonDetail() {
             </Svg>
             <Text style={styles.actionBtnGoldText}>Change Plan</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtnRed} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.actionBtnRed} activeOpacity={0.7} onPress={handleSuspendToggle}>
             <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
               <Path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke={colors.error} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               <Path d="M4.93 4.93l14.14 14.14" stroke={colors.error} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-            <Text style={styles.actionBtnRedText}>Suspend Salon</Text>
+            <Text style={styles.actionBtnRedText}>{isActive ? 'Suspend Salon' : 'Enable Salon'}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

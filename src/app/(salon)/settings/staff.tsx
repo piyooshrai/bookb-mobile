@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useStylistsBySalon } from '@/hooks/useStylist';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -35,7 +37,31 @@ const INITIAL_STAFF: StaffMember[] = [
 
 export default function StaffManagementScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+
+  // --- API hook ---
+  const { data: stylistsData, isLoading } = useStylistsBySalon();
+
+  const apiStaff: StaffMember[] = useMemo(() => {
+    if (isDemo || !stylistsData) return INITIAL_STAFF;
+    const list = Array.isArray(stylistsData) ? stylistsData : stylistsData.users || stylistsData.stylists || [];
+    return list.map((s: any) => ({
+      id: s._id || s.id,
+      name: s.name || 'Staff',
+      initials: (s.name || 'S').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase(),
+      role: s.description || 'Stylist',
+      specialty: Array.isArray(s.services) && s.services.length > 0
+        ? (typeof s.services[0] === 'object' ? s.services[0].title : 'General')
+        : 'General',
+      status: s.active !== false ? ('active' as const) : ('on_break' as const),
+      appointmentsToday: 0,
+      revenue: 0,
+      enabled: s.active !== false,
+    }));
+  }, [isDemo, stylistsData]);
+
   const [staff, setStaff] = useState(INITIAL_STAFF);
+  const displayStaff = !isDemo && apiStaff.length > 0 ? apiStaff : staff;
 
   const toggleStaff = (id: string) => {
     setStaff((prev) =>
@@ -57,7 +83,7 @@ export default function StaffManagementScreen() {
             <View style={styles.headerTitleRow}>
               <Text style={styles.title}>Staff</Text>
               <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{staff.length} members</Text>
+                <Text style={styles.countBadgeText}>{displayStaff.length} members</Text>
               </View>
             </View>
             <Text style={styles.subtitle}>Manage your team members</Text>
@@ -72,7 +98,12 @@ export default function StaffManagementScreen() {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        {staff.map((member) => (
+        {!isDemo && isLoading && (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <ActivityIndicator size="small" color={colors.gold} />
+          </View>
+        )}
+        {displayStaff.map((member) => (
           <View key={member.id} style={[styles.card, !member.enabled && styles.cardDisabled]}>
             <View style={styles.cardTop}>
               <View style={styles.avatar}>

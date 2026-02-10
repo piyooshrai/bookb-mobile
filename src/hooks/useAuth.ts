@@ -124,13 +124,14 @@ export function useLogout() {
   });
 }
 
-export function useRewardInfo() {
+export function useRewardInfo(enabled = true) {
   return useQuery({
     queryKey: ['rewards'],
     queryFn: async () => {
       const res = await authApi.getRewardInfo();
       return res.data;
     },
+    enabled,
   });
 }
 

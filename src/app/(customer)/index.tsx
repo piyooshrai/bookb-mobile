@@ -1,8 +1,12 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect, Polyline } from 'react-native-svg';
 import { useAuthStore } from '@/stores/authStore';
+import { useLatestAppointment, useAppointmentHistory } from '@/hooks/useAppointments';
+import { useRewardInfo } from '@/hooks/useAuth';
+import { useEnabledStylists } from '@/hooks/useStylist';
+import { Appointment, User } from '@/api/types';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -36,11 +40,79 @@ const MOCK_RECENT_VISITS = [
   { id: '3', date: 'Dec 30, 2025', service: 'Keratin Treatment', stylist: 'Jessica R.', price: 220, status: 'Completed' },
 ];
 
+function getStylistName(stylist: string | User | undefined): string {
+  if (!stylist) return 'Stylist';
+  if (typeof stylist === 'string') return 'Stylist';
+  return stylist.name || 'Stylist';
+}
+
+function getServiceName(service: unknown): string {
+  if (!service) return 'Service';
+  if (typeof service === 'string') return 'Service';
+  if (typeof service === 'object' && service !== null && 'title' in service) return (service as { title: string }).title;
+  return 'Service';
+}
+
+function getServicePrice(service: unknown): number {
+  if (!service) return 0;
+  if (typeof service === 'object' && service !== null && 'charges' in service) return (service as { charges: number }).charges;
+  return 0;
+}
+
 export default function CustomerHomeScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const isDemo = useAuthStore((s) => s.isDemo);
   const greeting = getGreeting();
   const firstName = user?.name?.split(' ')[0] || 'there';
+
+  // API hooks - disabled in demo mode
+  const { data: latestAppt, isLoading: loadingAppt } = useLatestAppointment();
+  const { data: rewardData } = useRewardInfo();
+  const { data: historyData, isLoading: loadingHistory } = useAppointmentHistory(
+    { pageNumber: 1, pageSize: 5 },
+    !isDemo,
+  );
+  const { data: stylistsData } = useEnabledStylists();
+
+  // Derive display data from API or mock fallback
+  const coins = rewardData?.coins ?? user?.coins ?? 100;
+
+  const salonUser = user?.salon && typeof user.salon === 'object' ? user.salon as User : null;
+  const salon = !isDemo && salonUser ? {
+    name: salonUser.name || MOCK_SALON.name,
+    address: salonUser.address || MOCK_SALON.address,
+    phone: salonUser.phone ? `${salonUser.countryCode || ''} ${salonUser.phone}` : MOCK_SALON.phone,
+    hours: MOCK_SALON.hours,
+    rating: MOCK_SALON.rating,
+    reviews: MOCK_SALON.reviews,
+  } : MOCK_SALON;
+
+  const upcoming = !isDemo && latestAppt ? {
+    id: latestAppt._id,
+    date: latestAppt.dateAsAString || 'Upcoming',
+    time: latestAppt.timeAsAString || '',
+    service: getServiceName(latestAppt.subService || latestAppt.mainService),
+    stylist: getStylistName(latestAppt.stylist),
+    price: getServicePrice(latestAppt.subService || latestAppt.mainService),
+  } : { ...MOCK_UPCOMING, id: 'appt-001' };
+
+  const favStylist = !isDemo && stylistsData && stylistsData.length > 0 ? {
+    name: stylistsData[0].name || MOCK_STYLIST.name,
+    initial: (stylistsData[0].name || 'S').charAt(0),
+    speciality: stylistsData[0].description || MOCK_STYLIST.speciality,
+    nextAvailable: MOCK_STYLIST.nextAvailable,
+    visits: MOCK_STYLIST.visits,
+  } : { ...MOCK_STYLIST, initial: 'J' };
+
+  const recentVisits = !isDemo && historyData?.result ? historyData.result.slice(0, 3).map((appt: Appointment) => ({
+    id: appt._id,
+    date: appt.dateAsAString || '',
+    service: getServiceName(appt.subService || appt.mainService),
+    stylist: getStylistName(appt.stylist),
+    price: getServicePrice(appt.subService || appt.mainService),
+    status: appt.status === 'completed' ? 'Completed' : appt.status === 'canceled' ? 'Cancelled' : 'Pending',
+  })) : MOCK_RECENT_VISITS;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -56,7 +128,7 @@ export default function CustomerHomeScreen() {
               <Circle cx={12} cy={12} r={10} stroke={colors.gold} strokeWidth={2} />
               <Path d="M12 6v12M9 9.5c0-.83 1.34-1.5 3-1.5s3 .67 3 1.5S14.66 11 12 11s-3 .67-3 1.5 1.34 1.5 3 1.5 3-.67 3-1.5" stroke={colors.gold} strokeWidth={1.8} strokeLinecap="round" />
             </Svg>
-            <Text style={styles.coinsText}>{user?.coins ?? 100} coins</Text>
+            <Text style={styles.coinsText}>{coins} coins</Text>
           </View>
         </View>
       </View>
@@ -70,7 +142,7 @@ export default function CustomerHomeScreen() {
             </View>
             <View style={styles.salonHeaderInfo}>
               <Text style={styles.salonCardLabel}>MY SALON</Text>
-              <Text style={styles.salonName}>{MOCK_SALON.name}</Text>
+              <Text style={styles.salonName}>{salon.name}</Text>
             </View>
           </View>
           <View style={styles.salonDetails}>
@@ -79,27 +151,27 @@ export default function CustomerHomeScreen() {
                 <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke={colors.textTertiary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
                 <Circle cx={12} cy={10} r={3} stroke={colors.textTertiary} strokeWidth={1.8} />
               </Svg>
-              <Text style={styles.salonDetailText}>{MOCK_SALON.address}</Text>
+              <Text style={styles.salonDetailText}>{salon.address}</Text>
             </View>
             <View style={styles.salonDetailRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" stroke={colors.textTertiary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
-              <Text style={styles.salonDetailText}>{MOCK_SALON.phone}</Text>
+              <Text style={styles.salonDetailText}>{salon.phone}</Text>
             </View>
             <View style={styles.salonDetailRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Circle cx={12} cy={12} r={10} stroke={colors.textTertiary} strokeWidth={1.8} />
                 <Polyline points="12 6 12 12 16 14" stroke={colors.textTertiary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
-              <Text style={styles.salonDetailText}>{MOCK_SALON.hours}</Text>
+              <Text style={styles.salonDetailText}>{salon.hours}</Text>
             </View>
             <View style={styles.salonDetailRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={colors.gold} stroke={colors.gold} strokeWidth={1} />
               </Svg>
-              <Text style={styles.salonRatingText}>{MOCK_SALON.rating}</Text>
-              <Text style={styles.salonReviewsText}>({MOCK_SALON.reviews} reviews)</Text>
+              <Text style={styles.salonRatingText}>{salon.rating}</Text>
+              <Text style={styles.salonReviewsText}>({salon.reviews} reviews)</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -115,12 +187,12 @@ export default function CustomerHomeScreen() {
         <View style={styles.upcomingCard}>
           <View style={styles.upcomingHeader}>
             <Text style={styles.upcomingLabel}>UPCOMING</Text>
-            <Text style={styles.upcomingDate}>{MOCK_UPCOMING.date} · {MOCK_UPCOMING.time}</Text>
+            <Text style={styles.upcomingDate}>{upcoming.date} · {upcoming.time}</Text>
           </View>
-          <Text style={styles.upcomingService}>{MOCK_UPCOMING.service} with {MOCK_UPCOMING.stylist}</Text>
+          <Text style={styles.upcomingService}>{upcoming.service} with {upcoming.stylist}</Text>
           <View style={styles.upcomingFooter}>
-            <Text style={styles.upcomingPrice}>${MOCK_UPCOMING.price}</Text>
-            <TouchableOpacity style={styles.manageButton} activeOpacity={0.7} onPress={() => router.push('/(customer)/appointment/appt-001')}>
+            <Text style={styles.upcomingPrice}>${upcoming.price}</Text>
+            <TouchableOpacity style={styles.manageButton} activeOpacity={0.7} onPress={() => router.push(`/(customer)/appointment/${upcoming.id}`)}>
               <Text style={styles.manageText}>Manage</Text>
             </TouchableOpacity>
           </View>
@@ -130,11 +202,11 @@ export default function CustomerHomeScreen() {
         <View style={styles.card}>
           <View style={styles.stylistCardHeader}>
             <View style={styles.stylistAvatar}>
-              <Text style={styles.stylistInitial}>J</Text>
+              <Text style={styles.stylistInitial}>{favStylist.initial || favStylist.name.charAt(0)}</Text>
             </View>
             <View style={styles.stylistInfo}>
-              <Text style={styles.stylistName}>{MOCK_STYLIST.name}</Text>
-              <Text style={styles.stylistSpeciality}>{MOCK_STYLIST.speciality}</Text>
+              <Text style={styles.stylistName}>{favStylist.name}</Text>
+              <Text style={styles.stylistSpeciality}>{favStylist.speciality}</Text>
             </View>
           </View>
           <View style={styles.stylistStatsRow}>
@@ -144,7 +216,7 @@ export default function CustomerHomeScreen() {
                 <Polyline points="12 6 12 12 16 14" stroke={colors.textTertiary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
               <Text style={styles.stylistStatLabel}>Next available</Text>
-              <Text style={styles.stylistStatValue}>{MOCK_STYLIST.nextAvailable}</Text>
+              <Text style={styles.stylistStatValue}>{favStylist.nextAvailable}</Text>
             </View>
             <View style={styles.stylistStatDivider} />
             <View style={styles.stylistStat}>
@@ -155,7 +227,7 @@ export default function CustomerHomeScreen() {
                 <Line x1={3} y1={10} x2={21} y2={10} stroke={colors.textTertiary} strokeWidth={1.8} />
               </Svg>
               <Text style={styles.stylistStatLabel}>Your visits</Text>
-              <Text style={styles.stylistStatValue}>{MOCK_STYLIST.visits} visits</Text>
+              <Text style={styles.stylistStatValue}>{favStylist.visits} visits</Text>
             </View>
           </View>
           <View style={styles.stylistActions}>
@@ -186,7 +258,7 @@ export default function CustomerHomeScreen() {
           <View style={styles.recentHeader}>
             <Text style={styles.cardTitle}>Recent Visits</Text>
           </View>
-          {MOCK_RECENT_VISITS.map((visit, index) => (
+          {recentVisits.map((visit, index) => (
             <View
               key={visit.id}
               style={[

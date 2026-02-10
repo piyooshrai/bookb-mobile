@@ -1,7 +1,9 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useChangeAppointmentStatus } from '@/hooks/useAppointments';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -46,7 +48,27 @@ const MOCK_APPOINTMENT = {
 export default function AppointmentDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const changeStatusMutation = useChangeAppointmentStatus();
   const apt = MOCK_APPOINTMENT;
+
+  const handleStatusChange = (newStatus: string) => {
+    if (isDemo) {
+      Alert.alert('Success', `Appointment ${newStatus}`, [{ text: 'OK' }]);
+      return;
+    }
+    changeStatusMutation.mutate(
+      { id: id as string, data: { status: newStatus as any, availabilityId: '', timeDataId: '' } },
+      {
+        onSuccess: () => {
+          Alert.alert('Success', `Appointment ${newStatus}`, [{ text: 'OK', onPress: () => router.back() }]);
+        },
+        onError: (err: any) => {
+          Alert.alert('Error', err?.message || `Failed to ${newStatus} appointment`);
+        },
+      },
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -154,7 +176,7 @@ export default function AppointmentDetailScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.actionOutline} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.actionOutline} activeOpacity={0.7} onPress={() => handleStatusChange('rescheduled')}>
             <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
               <Rect x={3} y={4} width={18} height={18} rx={2} stroke={colors.navy} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
               <Line x1={16} y1={2} x2={16} y2={6} stroke={colors.navy} strokeWidth={1.8} strokeLinecap="round" />
@@ -163,7 +185,7 @@ export default function AppointmentDetailScreen() {
             </Svg>
             <Text style={styles.actionOutlineText}>Reschedule</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionCancel} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.actionCancel} activeOpacity={0.7} onPress={() => handleStatusChange('cancel')}>
             <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
               <Circle cx={12} cy={12} r={10} stroke={colors.error} strokeWidth={1.8} />
               <Line x1={15} y1={9} x2={9} y2={15} stroke={colors.error} strokeWidth={1.8} strokeLinecap="round" />
@@ -171,11 +193,17 @@ export default function AppointmentDetailScreen() {
             </Svg>
             <Text style={styles.actionCancelText}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionComplete} activeOpacity={0.7}>
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-              <Path d="M20 6L9 17l-5-5" stroke={colors.textWhite} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-            <Text style={styles.actionCompleteText}>Complete</Text>
+          <TouchableOpacity style={styles.actionComplete} activeOpacity={0.7} onPress={() => handleStatusChange('complete')}>
+            {changeStatusMutation.isPending ? (
+              <ActivityIndicator size="small" color={colors.textWhite} />
+            ) : (
+              <>
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Path d="M20 6L9 17l-5-5" stroke={colors.textWhite} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+                <Text style={styles.actionCompleteText}>Complete</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 

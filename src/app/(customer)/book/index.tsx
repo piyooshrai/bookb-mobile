@@ -1,15 +1,15 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useAuthStore } from '@/stores/authStore';
+import { useServiceGroups } from '@/hooks/useServices';
 
 const STEPS = ['Service', 'Stylist', 'Time'];
 const ACTIVE_STEP = 0;
-
-const CATEGORIES = ['All', 'Hair', 'Color', 'Treatment', 'Styling'];
 
 const MOCK_SERVICES = [
   { id: '1', name: 'Haircut & Style', duration: '45 min', price: 65, description: 'Precision cut with wash and blowout finish', category: 'Hair' },
@@ -24,12 +24,35 @@ const MOCK_SERVICES = [
 
 export default function BookAppointment() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const { data: serviceGroupsData, isLoading } = useServiceGroups();
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedService, setSelectedService] = useState<string | null>(null);
 
+  const displayServices = useMemo(() => {
+    if (!isDemo && serviceGroupsData) {
+      return serviceGroupsData.flatMap((group) =>
+        group.subServices.map((sub) => ({
+          id: sub._id,
+          name: sub.title,
+          duration: `${sub.requiredTime} min`,
+          price: sub.charges,
+          description: sub.description,
+          category: group.mainService.title,
+          mainServiceId: group.mainService._id,
+        }))
+      );
+    }
+    return MOCK_SERVICES.map((s) => ({ ...s, mainServiceId: '' }));
+  }, [isDemo, serviceGroupsData]);
+
+  const categories = useMemo(() => {
+    return ['All', ...new Set(displayServices.map((s) => s.category))];
+  }, [displayServices]);
+
   const filteredServices = activeCategory === 'All'
-    ? MOCK_SERVICES
-    : MOCK_SERVICES.filter((s) => s.category === activeCategory);
+    ? displayServices
+    : displayServices.filter((s) => s.category === activeCategory);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -113,7 +136,7 @@ export default function BookAppointment() {
           contentContainerStyle={styles.categoryRow}
           style={styles.categoryScroll}
         >
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <TouchableOpacity
               key={cat}
               style={[
@@ -136,6 +159,11 @@ export default function BookAppointment() {
         </ScrollView>
 
         {/* Service List */}
+        {isLoading && !isDemo && (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <ActivityIndicator size="large" color={colors.gold} />
+          </View>
+        )}
         {filteredServices.map((service) => (
           <TouchableOpacity
             key={service.id}
@@ -189,7 +217,7 @@ export default function BookAppointment() {
           activeOpacity={0.7}
           disabled={!selectedService}
           onPress={() => {
-            const service = MOCK_SERVICES.find((s) => s.id === selectedService);
+            const service = displayServices.find((s) => s.id === selectedService);
             if (service) {
               router.push({
                 pathname: '/(customer)/book/stylist',
@@ -198,6 +226,7 @@ export default function BookAppointment() {
                   serviceName: service.name,
                   servicePrice: String(service.price),
                   serviceDuration: service.duration,
+                  mainServiceId: service.mainServiceId,
                 },
               });
             }

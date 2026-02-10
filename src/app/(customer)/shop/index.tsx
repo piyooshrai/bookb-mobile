@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useAuthStore } from '@/stores/authStore';
+import { useAppStore } from '@/stores/appStore';
+import { useProductsForMobile, useProductCategories } from '@/hooks/useProducts';
 
 const CATEGORIES = ['All', 'Shampoo', 'Conditioner', 'Styling', 'Treatment', 'Tools'];
 
@@ -27,17 +30,38 @@ const MOCK_PRODUCTS = [
   { id: '8', name: 'Heat Protectant', brand: 'Chi', price: 24, category: 'Styling', initial: 'H' },
 ];
 
-const CART_ITEMS = 3;
-const CART_TOTAL = 84.0;
-
 export default function ShopScreen() {
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState('All');
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const cartCount = useAppStore((s) => s.getCartCount());
+  const cartTotal = useAppStore((s) => s.getCartTotal());
+
+  const { data: apiProducts, isLoading: productsLoading } = useProductsForMobile();
+  const { data: apiCategories, isLoading: categoriesLoading } = useProductCategories();
+
+  const mappedProducts = !isDemo && apiProducts
+    ? apiProducts.map((p: any) => ({
+        id: p._id,
+        name: p.productName,
+        brand: p.category?.categoryName || 'Brand',
+        price: p.productPrice,
+        category: p.category?.categoryName || 'Other',
+        initial: p.productName?.charAt(0) || '?',
+      }))
+    : MOCK_PRODUCTS;
+
+  const categories = !isDemo && apiCategories
+    ? ['All', ...apiCategories.map((c: any) => c.categoryName)]
+    : CATEGORIES;
+
+  const CART_ITEMS = !isDemo ? cartCount : 3;
+  const CART_TOTAL = !isDemo ? cartTotal : 84.0;
 
   const filteredProducts =
     activeCategory === 'All'
-      ? MOCK_PRODUCTS
-      : MOCK_PRODUCTS.filter((p) => p.category === activeCategory);
+      ? mappedProducts
+      : mappedProducts.filter((p: any) => p.category === activeCategory);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -70,7 +94,12 @@ export default function ShopScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryRow}
         >
-          {CATEGORIES.map((cat) => (
+          {!isDemo && categoriesLoading && (
+            <View style={{ paddingHorizontal: 8, justifyContent: 'center' }}>
+              <ActivityIndicator size="small" color={colors.navy} />
+            </View>
+          )}
+          {categories.map((cat) => (
             <TouchableOpacity
               key={cat}
               style={[
@@ -100,6 +129,11 @@ export default function ShopScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.grid}>
+          {!isDemo && productsLoading && (
+            <View style={{ width: '100%', paddingVertical: 40, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={colors.navy} />
+            </View>
+          )}
           {filteredProducts.map((product) => {
             const catColor = CATEGORY_COLORS[product.category] || colors.navy;
             return (

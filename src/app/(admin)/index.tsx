@@ -1,6 +1,8 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Line, Rect, Polyline } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useAdminDashboard, useAdminSalonChart, useAdminSubscription } from '@/hooks/useReports';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -38,28 +40,87 @@ const MOCK_PLAN_BREAKDOWN = [
 ];
 
 export default function AdminDashboard() {
+  const isDemo = useAuthStore((s) => s.isDemo);
+
+  const { data: dashboardData, isLoading: dashboardLoading } = useAdminDashboard();
+  const { data: salonChartData, isLoading: chartLoading } = useAdminSalonChart();
+  const { data: subscriptionData, isLoading: subLoading } = useAdminSubscription();
+
+  // Map API data to platform stats (fallback to mock when demo or no data)
+  const platformStats = !isDemo && dashboardData
+    ? {
+        totalSalons: dashboardData.totalSalons ?? MOCK_PLATFORM_STATS.totalSalons,
+        activeSalons: dashboardData.activeSalons ?? MOCK_PLATFORM_STATS.activeSalons,
+        totalUsers: dashboardData.totalUsers ?? MOCK_PLATFORM_STATS.totalUsers,
+        totalStylists: dashboardData.totalStylists ?? MOCK_PLATFORM_STATS.totalStylists,
+        monthlyRevenue: dashboardData.monthlyRevenue ?? MOCK_PLATFORM_STATS.monthlyRevenue,
+        activeSubscriptions: dashboardData.activeSubscriptions ?? MOCK_PLATFORM_STATS.activeSubscriptions,
+        newSignupsThisWeek: dashboardData.newSignupsThisWeek ?? MOCK_PLATFORM_STATS.newSignupsThisWeek,
+        appointmentsToday: dashboardData.appointmentsToday ?? MOCK_PLATFORM_STATS.appointmentsToday,
+      }
+    : MOCK_PLATFORM_STATS;
+
+  // Map API subscription data to plan breakdown (fallback to mock when demo or no data)
+  const planBreakdown = !isDemo && subscriptionData && Array.isArray(subscriptionData)
+    ? subscriptionData.map((item: { plan: string; count: number }, i: number) => ({
+        plan: item.plan ?? MOCK_PLAN_BREAKDOWN[i]?.plan ?? 'Unknown',
+        count: item.count ?? 0,
+        color: item.plan === 'Professional'
+          ? colors.gold
+          : item.plan === 'Enterprise'
+            ? colors.navy
+            : item.plan === 'Trial'
+              ? colors.textTertiary
+              : colors.info,
+      }))
+    : MOCK_PLAN_BREAKDOWN;
+
+  // Map API salon chart data to top salons (fallback to mock when demo or no data)
+  const topSalons = !isDemo && salonChartData && Array.isArray(salonChartData)
+    ? salonChartData.map((salon: { _id?: string; name: string; revenue: number; appointments: number; rating: number }, i: number) => ({
+        id: salon._id ?? String(i + 1),
+        name: salon.name ?? 'Unknown',
+        revenue: salon.revenue ?? 0,
+        appointments: salon.appointments ?? 0,
+        rating: salon.rating ?? 0,
+      }))
+    : MOCK_TOP_SALONS;
+
+  // Recent signups always use mock data (no specific API endpoint for recent signups)
+  const recentSignups = MOCK_RECENT_SIGNUPS;
+
+  const isApiLoading = !isDemo && (dashboardLoading || chartLoading || subLoading);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>BookB Admin</Text>
         <Text style={styles.subtitle}>Platform overview</Text>
         <View style={styles.statsGrid}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{MOCK_PLATFORM_STATS.totalSalons}</Text>
-            <Text style={styles.statLabel}>Salons</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{(MOCK_PLATFORM_STATS.totalUsers / 1000).toFixed(1)}k</Text>
-            <Text style={styles.statLabel}>Users</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{MOCK_PLATFORM_STATS.totalStylists}</Text>
-            <Text style={styles.statLabel}>Stylists</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{(MOCK_PLATFORM_STATS.appointmentsToday / 1000).toFixed(1)}k</Text>
-            <Text style={styles.statLabel}>Appts Today</Text>
-          </View>
+          {isApiLoading ? (
+            <View style={{ flex: 1, alignItems: 'center', paddingVertical: 12 }}>
+              <ActivityIndicator size="small" color={colors.gold} />
+            </View>
+          ) : (
+            <>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{platformStats.totalSalons}</Text>
+                <Text style={styles.statLabel}>Salons</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{(platformStats.totalUsers / 1000).toFixed(1)}k</Text>
+                <Text style={styles.statLabel}>Users</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{platformStats.totalStylists}</Text>
+                <Text style={styles.statLabel}>Stylists</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{(platformStats.appointmentsToday / 1000).toFixed(1)}k</Text>
+                <Text style={styles.statLabel}>Appts Today</Text>
+              </View>
+            </>
+          )}
         </View>
       </View>
 
@@ -77,15 +138,15 @@ export default function AdminDashboard() {
             <Text style={styles.cardSub}>This month</Text>
           </View>
           <View style={styles.revenueRow}>
-            <Text style={styles.revenueBig}>${(MOCK_PLATFORM_STATS.monthlyRevenue / 1000).toFixed(1)}k</Text>
+            <Text style={styles.revenueBig}>${(platformStats.monthlyRevenue / 1000).toFixed(1)}k</Text>
             <View style={styles.revenueMini}>
               <View style={styles.miniItem}>
                 <View style={[styles.miniDot, { backgroundColor: colors.success }]} />
-                <Text style={styles.miniText}>{MOCK_PLATFORM_STATS.activeSubscriptions} active subs</Text>
+                <Text style={styles.miniText}>{platformStats.activeSubscriptions} active subs</Text>
               </View>
               <View style={styles.miniItem}>
                 <View style={[styles.miniDot, { backgroundColor: colors.info }]} />
-                <Text style={styles.miniText}>{MOCK_PLATFORM_STATS.newSignupsThisWeek} new this week</Text>
+                <Text style={styles.miniText}>{platformStats.newSignupsThisWeek} new this week</Text>
               </View>
             </View>
           </View>
@@ -103,12 +164,12 @@ export default function AdminDashboard() {
             </View>
           </View>
           <View style={styles.planBar}>
-            {MOCK_PLAN_BREAKDOWN.map((p) => (
+            {planBreakdown.map((p) => (
               <View key={p.plan} style={[styles.planSegment, { flex: p.count, backgroundColor: p.color }]} />
             ))}
           </View>
           <View style={styles.planLegend}>
-            {MOCK_PLAN_BREAKDOWN.map((p) => (
+            {planBreakdown.map((p) => (
               <View key={p.plan} style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: p.color }]} />
                 <Text style={styles.legendText}>{p.plan} ({p.count})</Text>
@@ -130,7 +191,7 @@ export default function AdminDashboard() {
               <Text style={styles.cardTitle}>Recent Signups</Text>
             </View>
           </View>
-          {MOCK_RECENT_SIGNUPS.map((salon) => (
+          {recentSignups.map((salon) => (
             <View key={salon.id} style={styles.signupRow}>
               <View style={styles.signupAvatar}>
                 <Text style={styles.signupInitial}>{salon.name[0]}</Text>
@@ -162,7 +223,7 @@ export default function AdminDashboard() {
             </View>
             <Text style={styles.cardSub}>By revenue</Text>
           </View>
-          {MOCK_TOP_SALONS.map((salon, i) => (
+          {topSalons.map((salon, i) => (
             <View key={salon.id} style={styles.topRow}>
               <Text style={styles.topRank}>#{i + 1}</Text>
               <View style={styles.topInfo}>

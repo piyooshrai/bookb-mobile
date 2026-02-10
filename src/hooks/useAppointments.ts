@@ -108,6 +108,28 @@ export function useUserActivity(params: { pageNumber: number; pageSize: number; 
   });
 }
 
+export function useAppointmentHistory(params: { pageNumber: number; pageSize: number; filterValue?: string }, enabled = true) {
+  return useQuery({
+    queryKey: ['appointments', 'history', params],
+    queryFn: async () => {
+      const res = await appointmentsApi.getHistoryByUser(params);
+      return res.data;
+    },
+    enabled,
+  });
+}
+
+export function useAppointmentsByStylist(params: { pageNumber: number; pageSize: number; filterValue?: string; stylistId?: string }, enabled = true) {
+  return useQuery({
+    queryKey: ['appointments', 'byStylist', params],
+    queryFn: async () => {
+      const res = await appointmentsApi.getByStylist(params);
+      return res.data;
+    },
+    enabled,
+  });
+}
+
 export function useAppointmentMetrics(salonId: string) {
   const conversionRate = useQuery({
     queryKey: ['appointments', 'conversion', salonId],

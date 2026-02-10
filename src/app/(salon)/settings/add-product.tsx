@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { productsApi } from '@/api/products';
+import { useQueryClient } from '@tanstack/react-query';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -18,6 +21,10 @@ const CATEGORIES = ['Shampoo', 'Conditioner', 'Styling', 'Treatment', 'Tools'] a
 
 export default function AddProductScreen() {
   const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const salonId = useAuthStore((s) => s.salonId);
+  const queryClient = useQueryClient();
+  const [isSaving, setIsSaving] = useState(false);
 
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('');
@@ -26,10 +33,39 @@ export default function AddProductScreen() {
   const [stockQuantity, setStockQuantity] = useState('');
   const [description, setDescription] = useState('');
 
-  const handleSave = () => {
-    Alert.alert('Success', 'Product added', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+  const handleSave = async () => {
+    if (isDemo) {
+      Alert.alert('Success', 'Product added', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+      return;
+    }
+
+    if (!productName.trim()) {
+      Alert.alert('Validation', 'Please enter a product name');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append('productName', productName.trim());
+      formData.append('productPrice', price || '0');
+      formData.append('stock', stockQuantity || '0');
+      formData.append('description', description.trim());
+      if (salonId) formData.append('salon', salonId);
+      if (category) formData.append('category', category);
+      if (brand) formData.append('brand', brand.trim());
+      await productsApi.addProduct(formData);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      Alert.alert('Success', 'Product added', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to add product');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -138,8 +174,12 @@ export default function AddProductScreen() {
 
       {/* Save Button */}
       <View style={styles.saveButtonContainer}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8}>
-          <Text style={styles.saveButtonText}>SAVE PRODUCT</Text>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave} activeOpacity={0.8} disabled={isSaving}>
+          {isSaving ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.saveButtonText}>SAVE PRODUCT</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

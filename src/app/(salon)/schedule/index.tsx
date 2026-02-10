@@ -1,6 +1,10 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
+import { useAuthStore } from '@/stores/authStore';
+import { useDashboardAppointments } from '@/hooks/useAppointments';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -59,6 +63,55 @@ const totalCount = MOCK_APPOINTMENTS.length;
 // ---------------------------------------------------------------------------
 
 export default function AppointmentsCalendarScreen() {
+  const router = useRouter();
+  const isDemo = useAuthStore((s) => s.isDemo);
+  const salonId = useAuthStore((s) => s.salonId);
+
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+
+  // Compute the date for the selected day
+  const selectedDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + selectedDayIndex);
+    return d.toISOString().slice(0, 10);
+  }, [selectedDayIndex]);
+
+  const offset = new Date().getTimezoneOffset();
+
+  const { data: appointmentsData, isLoading } = useDashboardAppointments(
+    { salon: salonId || '', fromDate: selectedDate, toDate: selectedDate, offset },
+    !isDemo && !!salonId,
+  );
+
+  const displayAppointments: Appointment[] = useMemo(() => {
+    if (isDemo || !appointmentsData) return MOCK_APPOINTMENTS;
+    const list = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.appointments || [];
+    if (list.length === 0) return MOCK_APPOINTMENTS;
+    return list.map((apt: any, idx: number) => ({
+      id: apt._id || String(idx),
+      time: apt.timeAsAString || '',
+      duration: apt.mainService?.requiredTime ? `${apt.mainService.requiredTime} min` : '60 min',
+      client: typeof apt.user === 'object' ? apt.user?.name : 'Client',
+      service: typeof apt.mainService === 'object' ? apt.mainService?.title : (typeof apt.subService === 'object' ? apt.subService?.title : 'Service'),
+      stylist: typeof apt.stylist === 'object' ? apt.stylist?.name : 'Stylist',
+      price: typeof apt.mainService === 'object' ? (apt.mainService?.charges ?? 0) : 0,
+      status: (apt.status === 'complete' ? 'completed' : apt.status === 'pending' ? 'waiting' : apt.status || 'confirmed') as AppointmentStatus,
+    }));
+  }, [isDemo, appointmentsData]);
+
+  const displayCompleted = displayAppointments.filter((a) => a.status === 'completed').length;
+  const displayTotal = displayAppointments.length;
+
+  // Build dynamic DAYS from today
+  const dynamicDays = useMemo(() => {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      return { label: dayNames[d.getDay()], date: d.getDate(), isToday: i === selectedDayIndex };
+    });
+  }, [selectedDayIndex]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -66,9 +119,9 @@ export default function AppointmentsCalendarScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.title}>Schedule</Text>
-            <Text style={styles.subtitle}>February 2026 · {completedCount}/{totalCount} completed</Text>
+            <Text style={styles.subtitle}>February 2026 · {displayCompleted}/{displayTotal} completed</Text>
           </View>
-          <TouchableOpacity style={styles.addButton} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.addButton} activeOpacity={0.7} onPress={() => router.push('/(salon)/schedule/new')}>
             <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
               <Circle cx={12} cy={12} r={10} stroke={colors.textWhite} strokeWidth={1.8} />
               <Line x1={12} y1={8} x2={12} y2={16} stroke={colors.textWhite} strokeWidth={1.8} strokeLinecap="round" />
@@ -79,11 +132,12 @@ export default function AppointmentsCalendarScreen() {
 
         {/* Day selector */}
         <View style={styles.dayRow}>
-          {DAYS.map((day) => (
+          {dynamicDays.map((day, idx) => (
             <TouchableOpacity
-              key={day.label}
+              key={day.label + day.date}
               style={[styles.dayItem, day.isToday && styles.dayItemActive]}
               activeOpacity={0.7}
+              onPress={() => setSelectedDayIndex(idx)}
             >
               <Text style={[styles.dayLabel, day.isToday && styles.dayLabelActive]}>{day.label}</Text>
               <Text style={[styles.dayDate, day.isToday && styles.dayDateActive]}>{day.date}</Text>
@@ -95,7 +149,12 @@ export default function AppointmentsCalendarScreen() {
 
       {/* Appointments list */}
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-        {MOCK_APPOINTMENTS.map((apt) => {
+        {!isDemo && isLoading && (
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <ActivityIndicator size="small" color={colors.gold} />
+          </View>
+        )}
+        {displayAppointments.map((apt) => {
           const statusCfg = STATUS_CONFIG[apt.status];
           return (
             <View key={apt.id} style={styles.card}>
