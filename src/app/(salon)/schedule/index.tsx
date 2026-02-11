@@ -86,11 +86,14 @@ export default function AppointmentsCalendarScreen() {
     }
   }, [stylists, selectedStylistId]);
 
-  // Compute the date for the selected day
+  // Compute the date for the selected day (MM/DD/YYYY to match backend format)
   const selectedDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + selectedDayIndex);
-    return d.toISOString().slice(0, 10);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
   }, [selectedDayIndex]);
 
   const offset = new Date().getTimezoneOffset();
