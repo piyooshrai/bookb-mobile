@@ -179,17 +179,21 @@ export default function NewAppointmentScreen() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
-  // Clear stale selections when the service/stylist lists change
+  // Clear stale selections when the service/stylist lists change (only on list identity change)
+  const prevServicesRef = useMemo(() => displayServices.map((s) => s.id).join(','), [displayServices]);
+  const prevStylistsRef = useMemo(() => displayStylists.map((s: any) => s.id).join(','), [displayStylists]);
   useEffect(() => {
     if (selectedService && !displayServices.find((s) => s.id === selectedService)) {
+      console.log('[NewAppt] Clearing stale service selection:', selectedService);
       setSelectedService(null);
     }
-  }, [displayServices]);
+  }, [prevServicesRef]);
   useEffect(() => {
     if (selectedStylist && !displayStylists.find((s: any) => s.id === selectedStylist)) {
+      console.log('[NewAppt] Clearing stale stylist selection:', selectedStylist);
       setSelectedStylist(null);
     }
-  }, [displayStylists]);
+  }, [prevStylistsRef]);
 
   const filteredServices = selectedCategory === 'All'
     ? displayServices
@@ -213,7 +217,7 @@ export default function NewAppointmentScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* ---- Client Section ---- */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
@@ -278,7 +282,7 @@ export default function NewAppointmentScreen() {
           </View>
 
           {/* Category pills */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll} contentContainerStyle={styles.pillContent}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll} contentContainerStyle={styles.pillContent} keyboardShouldPersistTaps="handled">
             {SERVICE_CATEGORIES.map((cat) => (
               <TouchableOpacity
                 key={cat}
@@ -296,7 +300,7 @@ export default function NewAppointmentScreen() {
             <TouchableOpacity
               key={service.id}
               style={[styles.serviceRow, selectedService === service.id && styles.serviceRowActive]}
-              onPress={() => setSelectedService(service.id)}
+              onPress={() => { console.log('[NewAppt] Service tapped:', service.id, service.name); setSelectedService(service.id); }}
               activeOpacity={0.7}
             >
               <View style={styles.radioOuter}>
@@ -323,7 +327,7 @@ export default function NewAppointmentScreen() {
             <Text style={styles.sectionTitle}>Stylist</Text>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stylistScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stylistScroll} keyboardShouldPersistTaps="handled">
             {displayStylists.map((stylist: any) => (
               <TouchableOpacity
                 key={stylist.id}
@@ -366,7 +370,7 @@ export default function NewAppointmentScreen() {
           </View>
 
           {/* Date pills */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayScroll}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayScroll} keyboardShouldPersistTaps="handled">
             {DAYS.map((day) => (
               <TouchableOpacity
                 key={day.key}
