@@ -57,10 +57,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async ({ user, token, role, isFirstLogin = false }) => {
     await SecureStore.setItemAsync(TOKEN_KEY, token);
-    let salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || null;
+    let salonId = typeof user.salon === 'string' && user.salon ? user.salon : (user.salon as any)?._id || null;
     // For salon role, the user's own _id IS the salon ID
     if (!salonId && role === 'salon') salonId = user._id;
-    const stylistId = typeof user.stylist === 'string' ? user.stylist : user.stylist?._id || null;
+    const stylistId = typeof user.stylist === 'string' ? user.stylist : (user.stylist as any)?._id || null;
+    console.log('[Auth] login - role:', role, 'user.salon:', JSON.stringify(user.salon), 'derived salonId:', salonId, 'user._id:', user._id);
     set({
       user,
       token,

@@ -457,6 +457,7 @@ export default function NewAppointmentScreen() {
           activeOpacity={0.8}
           disabled={createAppointmentMutation.isPending}
           onPress={() => {
+            console.log('[NewAppt] salonId:', salonId, 'isDemo:', isDemo);
             if (isDemo) {
               Alert.alert('Success', 'Appointment booked', [{ text: 'OK', onPress: () => router.back() }]);
               return;
@@ -486,6 +487,20 @@ export default function NewAppointmentScreen() {
             const time24 = `${String(hour24).padStart(2, '0')}:${timeMatch ? timeMatch[2] : '00'}`;
 
             const svc = displayServices.find((s) => s.id === selectedService);
+            const requestPayload = {
+                data: {
+                  appointmentDate,
+                  timeData: { timeAsADate: time24, timeAsAString: selectedTime!, id: '' },
+                  salon: salonId || '',
+                  stylistId: selectedStylist!,
+                  mainService: svc?.mainServiceId || selectedService!,
+                  subService: selectedService!,
+                  comment: notes,
+                  requiredDuration: parseInt(svc?.duration || '60') || 60,
+                },
+                offset: new Date().getTimezoneOffset(),
+            };
+            console.log('[NewAppt] Creating appointment:', JSON.stringify(requestPayload));
             createAppointmentMutation.mutate(
               {
                 data: {
