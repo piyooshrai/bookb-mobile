@@ -448,6 +448,7 @@ export default function NewAppointmentScreen() {
               return;
             }
             const missing: string[] = [];
+            if (!selectedClient) missing.push('client');
             if (!selectedService) missing.push('service');
             if (!selectedStylist) missing.push('stylist');
             if (!selectedTime) missing.push('time');
@@ -470,6 +471,7 @@ export default function NewAppointmentScreen() {
             const time24 = `${String(hour24).padStart(2, '0')}:${timeMatch ? timeMatch[2] : '00'}`;
 
             const svc = displayServices.find((s) => s.id === selectedService);
+            const client = RECENT_CLIENTS.find((c) => c.id === selectedClient);
             createAppointmentMutation.mutate(
               {
                 data: {
@@ -481,6 +483,7 @@ export default function NewAppointmentScreen() {
                   },
                   salon: salonId || '',
                   stylistId: selectedStylist!,
+                  name: client?.name || 'Walk-in Client',
                   mainService: svc?.mainServiceId || selectedService!,
                   subService: selectedService!,
                   comment: notes,
