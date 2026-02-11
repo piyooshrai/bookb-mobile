@@ -106,8 +106,10 @@ export default function AppointmentsCalendarScreen() {
   const displayAppointments: Appointment[] = useMemo(() => {
     if (isDemo) return MOCK_APPOINTMENTS;
     if (!appointmentsData) return [];
+    console.log('[Schedule] raw appointmentsData:', JSON.stringify(appointmentsData).slice(0, 800));
     const raw = Array.isArray(appointmentsData) ? appointmentsData : (appointmentsData as any).result || (appointmentsData as any).data || [];
     const list = Array.isArray(raw) ? raw : [];
+    console.log('[Schedule] parsed list length:', list.length, 'query params:', { salon: salonId, stylistId: selectedStylistId, fromDate: selectedDate, toDate: selectedDate });
     return list.map((apt: any, idx: number) => ({
       id: apt._id || String(idx),
       time: apt.timeAsAString || apt.timeData?.timeAsAString || '',
