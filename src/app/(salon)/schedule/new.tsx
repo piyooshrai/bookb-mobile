@@ -93,6 +93,7 @@ export default function NewAppointmentScreen() {
   const router = useRouter();
   const isDemo = useAuthStore((s) => s.isDemo);
   const salonId = useAuthStore((s) => s.salonId || (s.role === 'salon' ? s.user?._id : null));
+  const salonUser = useAuthStore((s) => s.user);
 
   const createAppointmentMutation = useCreateAppointment();
   const { data: serviceGroupsData } = useServiceGroups();
@@ -484,6 +485,8 @@ export default function NewAppointmentScreen() {
                   salon: salonId || '',
                   stylistId: selectedStylist!,
                   name: client?.name || 'Walk-in Client',
+                  email: salonUser?.email || '',
+                  mobile: salonUser?.phone || '',
                   mainService: svc?.mainServiceId || selectedService!,
                   subService: selectedService!,
                   comment: notes,
@@ -496,7 +499,8 @@ export default function NewAppointmentScreen() {
                   Alert.alert('Success', 'Appointment booked', [{ text: 'OK', onPress: () => router.back() }]);
                 },
                 onError: (err: any) => {
-                  Alert.alert('Error', err?.message || 'Failed to book appointment');
+                  const msg = err?.response?.data?.message || err?.message || 'Failed to book appointment';
+                  Alert.alert('Error', msg);
                 },
               },
             );
