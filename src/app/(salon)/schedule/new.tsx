@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -98,54 +98,73 @@ export default function NewAppointmentScreen() {
   const { data: serviceGroupsData } = useServiceGroups();
   const { data: stylistsData } = useStylistsBySalon();
 
+  // Helper: extract a usable ID from any API object
+  const extractId = (obj: any): string => {
+    if (!obj || typeof obj !== 'object') return '';
+    return String(obj._id || obj.id || obj.$oid || '');
+  };
+
   // Build API-based services and stylists
   const apiServices = useMemo(() => {
     if (isDemo || !serviceGroupsData) return SERVICES;
     const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : (serviceGroupsData as any)?.result || (serviceGroupsData as any)?.serviceGroups || [];
+    // Log raw data shape for debugging
+    if (groups.length > 0) {
+      console.log('[NewAppt] Raw service group[0]:', JSON.stringify(groups[0]).slice(0, 500));
+    }
     const flat: { id: string; name: string; duration: string; price: number; category: string; mainServiceId: string }[] = [];
     groups.forEach((group: any) => {
       const mainSvc = group.mainService || group.category;
-      const mainId = typeof mainSvc === 'object' ? (mainSvc?._id || mainSvc?.id || '') : '';
+      const mainId = extractId(mainSvc);
       const rawSubs = group.subServices || group.subService || [];
-      (Array.isArray(rawSubs) ? rawSubs : []).forEach((sub: any) => {
-        const subId = sub._id || sub.id;
+      const subs = Array.isArray(rawSubs) ? rawSubs : [];
+      subs.forEach((sub: any) => {
+        const subId = extractId(sub);
         if (subId) {
           flat.push({
             id: subId,
-            name: sub.title || 'Sub-service',
+            name: sub.title || sub.name || 'Sub-service',
             duration: `${sub.requiredTime || 30} min`,
-            price: sub.charges || 0,
-            category: mainSvc?.title || 'All',
+            price: sub.charges || sub.price || 0,
+            category: mainSvc?.title || mainSvc?.name || 'All',
             mainServiceId: mainId,
           });
         }
       });
-      // Only add main service if there are no sub-services
-      if (mainId && rawSubs.length === 0) {
+      // Add main service if no sub-services were added for this group
+      if (mainId && subs.length === 0) {
         flat.push({
           id: mainId,
-          name: mainSvc.title || 'Service',
+          name: mainSvc.title || mainSvc.name || 'Service',
           duration: `${mainSvc.requiredTime || 60} min`,
-          price: mainSvc.charges || 0,
-          category: mainSvc.title || 'All',
+          price: mainSvc.charges || mainSvc.price || 0,
+          category: mainSvc.title || mainSvc.name || 'All',
           mainServiceId: mainId,
         });
       }
     });
+    if (flat.length > 0) {
+      console.log('[NewAppt] Mapped services:', flat.length, 'first id:', flat[0].id);
+    } else {
+      console.warn('[NewAppt] No services extracted from API, falling back to mock');
+    }
     return flat.length > 0 ? flat : SERVICES.map((s) => ({ ...s, mainServiceId: '' }));
   }, [isDemo, serviceGroupsData]);
 
   const apiStylists = useMemo(() => {
     if (isDemo || !stylistsData) return STYLISTS;
     const list = Array.isArray(stylistsData) ? stylistsData : (stylistsData as any)?.result || (stylistsData as any)?.users || (stylistsData as any)?.stylists || [];
+    if (list.length > 0) {
+      console.log('[NewAppt] Raw stylist[0]:', JSON.stringify(list[0]).slice(0, 300));
+    }
     const mapped = list
-      .filter((s: any) => s._id || s.id)
       .map((s: any) => ({
-        id: String(s._id || s.id),
+        id: extractId(s),
         name: s.name || 'Stylist',
         initial: (s.name || 'S')[0].toUpperCase(),
         status: (s.active !== false ? 'available' : 'busy') as 'available' | 'busy',
-      }));
+      }))
+      .filter((s: any) => s.id);
     return mapped.length > 0 ? mapped : STYLISTS;
   }, [isDemo, stylistsData]);
 
@@ -159,6 +178,18 @@ export default function NewAppointmentScreen() {
   const [selectedDay, setSelectedDay] = useState(DAYS[0].key);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+
+  // Clear stale selections when the service/stylist lists change
+  useEffect(() => {
+    if (selectedService && !displayServices.find((s) => s.id === selectedService)) {
+      setSelectedService(null);
+    }
+  }, [displayServices]);
+  useEffect(() => {
+    if (selectedStylist && !displayStylists.find((s: any) => s.id === selectedStylist)) {
+      setSelectedStylist(null);
+    }
+  }, [displayStylists]);
 
   const filteredServices = selectedCategory === 'All'
     ? displayServices
@@ -425,7 +456,9 @@ export default function NewAppointmentScreen() {
             if (!selectedStylist) missing.push('stylist');
             if (!selectedTime) missing.push('time');
             if (missing.length > 0) {
-              Alert.alert('Validation', `Please select a ${missing.join(', ')}`);
+              console.warn('[NewAppt] Validation failed:', { selectedService, selectedStylist, selectedTime });
+              console.warn('[NewAppt] displayServices count:', displayServices.length, 'ids:', displayServices.map((s) => s.id));
+              Alert.alert('Validation', `Please select a ${missing.join(', ')}\n\n(Debug: svc=${JSON.stringify(selectedService)}, sty=${JSON.stringify(selectedStylist)}, time=${JSON.stringify(selectedTime)}, services=${displayServices.length})`);
               return;
             }
             const selectedDayObj = DAYS[parseInt(selectedDay.replace('day-', ''))];
