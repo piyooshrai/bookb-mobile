@@ -21,7 +21,7 @@ const RECENT_CLIENTS = [
   { id: '4', name: 'Aisha P.' },
 ];
 
-const SERVICE_CATEGORIES = ['All', 'Color', 'Cut', 'Treatment', 'Styling'];
+// Categories are built dynamically from API data — see serviceCategories useMemo below
 
 interface Service {
   id: string;
@@ -195,6 +195,12 @@ export default function NewAppointmentScreen() {
     }
   }, [prevStylistsRef]);
 
+  // Build categories dynamically from actual service data
+  const serviceCategories = useMemo(() => {
+    const cats = new Set(displayServices.map((s) => s.category));
+    return ['All', ...Array.from(cats)];
+  }, [displayServices]);
+
   const filteredServices = selectedCategory === 'All'
     ? displayServices
     : displayServices.filter((s) => s.category === selectedCategory);
@@ -283,7 +289,7 @@ export default function NewAppointmentScreen() {
 
           {/* Category pills */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillScroll} contentContainerStyle={styles.pillContent} keyboardShouldPersistTaps="handled">
-            {SERVICE_CATEGORIES.map((cat) => (
+            {serviceCategories.map((cat) => (
               <TouchableOpacity
                 key={cat}
                 style={[styles.pill, selectedCategory === cat && styles.pillActive]}
