@@ -96,22 +96,23 @@ export default function AppointmentsCalendarScreen() {
   const offset = new Date().getTimezoneOffset();
 
   const { data: appointmentsData, isLoading } = useDashboardAppointments(
-    { stylistId: selectedStylistId || '', fromDate: selectedDate, toDate: selectedDate, offset },
+    { salon: salonId || '', stylistId: selectedStylistId || '', fromDate: selectedDate, toDate: selectedDate, offset },
     !isDemo && !!selectedStylistId,
   );
 
   const displayAppointments: Appointment[] = useMemo(() => {
-    if (isDemo || !appointmentsData) return MOCK_APPOINTMENTS;
-    const list = Array.isArray(appointmentsData) ? appointmentsData : (appointmentsData as any).result || [];
-    if (list.length === 0) return MOCK_APPOINTMENTS;
+    if (isDemo) return MOCK_APPOINTMENTS;
+    if (!appointmentsData) return [];
+    const raw = Array.isArray(appointmentsData) ? appointmentsData : (appointmentsData as any).result || (appointmentsData as any).data || [];
+    const list = Array.isArray(raw) ? raw : [];
     return list.map((apt: any, idx: number) => ({
       id: apt._id || String(idx),
-      time: apt.timeAsAString || '',
-      duration: apt.mainService?.requiredTime ? `${apt.mainService.requiredTime} min` : '60 min',
-      client: typeof apt.user === 'object' ? apt.user?.name : 'Client',
-      service: typeof apt.mainService === 'object' ? apt.mainService?.title : (typeof apt.subService === 'object' ? apt.subService?.title : 'Service'),
+      time: apt.timeAsAString || apt.timeData?.timeAsAString || '',
+      duration: apt.requiredDuration ? `${apt.requiredDuration} min` : (apt.mainService?.requiredTime ? `${apt.mainService.requiredTime} min` : '60 min'),
+      client: typeof apt.user === 'object' ? apt.user?.name : (apt.name || 'Client'),
+      service: typeof apt.subService === 'object' ? apt.subService?.title : (typeof apt.mainService === 'object' ? apt.mainService?.title : 'Service'),
       stylist: typeof apt.stylist === 'object' ? apt.stylist?.name : 'Stylist',
-      price: typeof apt.mainService === 'object' ? (apt.mainService?.charges ?? 0) : 0,
+      price: typeof apt.subService === 'object' ? (apt.subService?.charges ?? 0) : (typeof apt.mainService === 'object' ? (apt.mainService?.charges ?? 0) : 0),
       status: (apt.status === 'complete' ? 'completed' : apt.status === 'pending' ? 'waiting' : apt.status || 'confirmed') as AppointmentStatus,
     }));
   }, [isDemo, appointmentsData]);
@@ -188,6 +189,11 @@ export default function AppointmentsCalendarScreen() {
         {!isDemo && isLoading && (
           <View style={{ alignItems: 'center', paddingVertical: 20 }}>
             <ActivityIndicator size="small" color={colors.gold} />
+          </View>
+        )}
+        {!isDemo && !isLoading && displayAppointments.length === 0 && (
+          <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+            <Text style={{ fontFamily: fontFamilies.body, fontSize: 14, color: colors.textTertiary }}>No appointments for this day</Text>
           </View>
         )}
         {displayAppointments.map((apt) => {
