@@ -64,12 +64,13 @@ export default function MyAvailabilityScreen() {
 
   // Map API data to display format
   const hours: DaySchedule[] = useMemo(() => {
-    if (isDemo || !businessHoursData) return MOCK_HOURS;
+    if (isDemo) return MOCK_HOURS;
+    if (!businessHoursData) return [];
     const bh = businessHoursData as any;
     // Handle possible { result: [...] } wrapper or direct object
     const unwrapped = Array.isArray(bh) ? bh[0] : bh?.result ? (Array.isArray(bh.result) ? bh.result[0] : bh.result) : bh;
     const slots = unwrapped?.slots || unwrapped?.data?.slots;
-    if (!slots || !Array.isArray(slots)) return MOCK_HOURS;
+    if (!slots || !Array.isArray(slots)) return [];
     return mapBusinessHoursToSchedule(slots);
   }, [isDemo, businessHoursData]);
 
@@ -80,7 +81,7 @@ export default function MyAvailabilityScreen() {
   const totalMinutes = hours
     .filter((d) => d.isOn && d.start !== '--' && d.end !== '--')
     .reduce((sum, d) => sum + getDurationMinutes(d.start, d.end), 0);
-  const thisWeekHours = !isDemo && businessHoursData ? +(totalMinutes / 60).toFixed(2) : THIS_WEEK_HOURS;
+  const thisWeekHours = isDemo ? THIS_WEEK_HOURS : +(totalMinutes / 60).toFixed(2);
   const avgPerDay = workingDays > 0 ? +(thisWeekHours / workingDays).toFixed(2) : 0;
 
   return (
@@ -93,6 +94,12 @@ export default function MyAvailabilityScreen() {
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         {!isDemo && isLoading && (
           <ActivityIndicator size="small" color={colors.gold} style={{ marginVertical: 12 }} />
+        )}
+
+        {hours.length === 0 && !isLoading && (
+          <View style={{ backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 24, alignItems: 'center' }}>
+            <Text style={{ fontFamily: fontFamilies.body, fontSize: 14, color: colors.textTertiary, textAlign: 'center' }}>No availability hours set up yet. Configure your working hours to get started.</Text>
+          </View>
         )}
 
         {/* Summary Stats */}
@@ -117,7 +124,7 @@ export default function MyAvailabilityScreen() {
                 <Line x1={3} y1={10} x2={21} y2={10} stroke={colors.gold} strokeWidth={1.8} strokeLinecap="round" />
               </Svg>
             </View>
-            <Text style={styles.statValue}>{isDemo ? NEXT_WEEK_HOURS : thisWeekHours}h</Text>
+            <Text style={styles.statValue}>{isDemo ? NEXT_WEEK_HOURS : +(totalMinutes / 60).toFixed(2)}h</Text>
             <Text style={styles.statLabel}>Next Week</Text>
           </View>
         </View>

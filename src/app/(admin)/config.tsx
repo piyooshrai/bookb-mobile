@@ -23,35 +23,41 @@ export default function AdminConfigScreen() {
   const { data: dashboardData, isLoading: dashboardLoading } = useAdminDashboard();
   const { data: usersData, isLoading: usersLoading } = useUsers({ pageNumber: 1, pageSize: 1 });
 
-  // Map API data to user management rows (fallback to mock when demo or no data)
+  // Map API data to user management rows (demo → mock, non-demo → API data or zeros)
   const db = dashboardData as any;
-  const userManagementRows = !isDemo && db
-    ? [
-        {
-          label: 'Total Users',
-          value: db.totalUsers != null
-            ? Number(db.totalUsers).toLocaleString()
-            : MOCK_USER_MANAGEMENT_ROWS[0].value,
-          badge: null as number | null,
-        },
-        {
-          label: 'Active Salons',
-          value: db.activeSalons != null
-            ? String(db.activeSalons)
-            : MOCK_USER_MANAGEMENT_ROWS[1].value,
-          badge: null as number | null,
-        },
-        {
-          label: 'Pending Approvals',
-          value: db.pendingApprovals != null
-            ? String(db.pendingApprovals)
-            : MOCK_USER_MANAGEMENT_ROWS[2].value,
-          badge: db.pendingApprovals != null
-            ? (db.pendingApprovals > 0 ? Number(db.pendingApprovals) : null)
-            : MOCK_USER_MANAGEMENT_ROWS[2].badge,
-        },
-      ]
-    : MOCK_USER_MANAGEMENT_ROWS;
+  const userManagementRows = isDemo
+    ? MOCK_USER_MANAGEMENT_ROWS
+    : db
+      ? [
+          {
+            label: 'Total Users',
+            value: db.totalUsers != null
+              ? Number(db.totalUsers).toLocaleString()
+              : '0',
+            badge: null as number | null,
+          },
+          {
+            label: 'Active Salons',
+            value: db.activeSalons != null
+              ? String(db.activeSalons)
+              : '0',
+            badge: null as number | null,
+          },
+          {
+            label: 'Pending Approvals',
+            value: db.pendingApprovals != null
+              ? String(db.pendingApprovals)
+              : '0',
+            badge: db.pendingApprovals != null
+              ? (db.pendingApprovals > 0 ? Number(db.pendingApprovals) : null)
+              : null,
+          },
+        ]
+      : [
+          { label: 'Total Users', value: '0', badge: null as number | null },
+          { label: 'Active Salons', value: '0', badge: null as number | null },
+          { label: 'Pending Approvals', value: '0', badge: null as number | null },
+        ];
 
   // Feature flag toggles
   const [maintenanceMode, setMaintenanceMode] = useState(false);

@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect, Polygon } from 'react-native-svg';
-import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -70,9 +69,19 @@ const MOCK_PRODUCTS: Product[] = [
 
 export default function ClientDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const isDemo = useAuthStore((s) => s.isDemo);
-  const client = MOCK_CLIENT;
+  const { id, name, phone, email, visits, spent } = useLocalSearchParams();
+  const clientName = (name as string) || 'Client';
+  const clientInitials = clientName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+  const client = {
+    name: clientName,
+    initials: clientInitials,
+    memberSince: '',
+    email: (email as string) || '',
+    phone: (phone as string) || '',
+    stats: { visits: parseInt((visits as string) || '0') || 0, spent: parseInt((spent as string) || '0') || 0, avgRating: 0 },
+    preferredStylist: '',
+    notes: '',
+  };
   const [clientNotes, setClientNotes] = useState(client.notes);
 
   return (

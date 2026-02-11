@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
+import { useAppStore } from '@/stores/appStore';
+import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -23,13 +25,6 @@ const CART_ITEMS: CartItem[] = [
   { id: '3', type: 'product', name: 'Leave-in Conditioner', price: 22.0 },
 ];
 
-const SUBTOTAL = 235.0;
-const DISCOUNT_AMOUNT = 23.5;
-const TAX_RATE = 0.08;
-const DISCOUNTED_SUBTOTAL = SUBTOTAL - DISCOUNT_AMOUNT;
-const TAX = parseFloat((DISCOUNTED_SUBTOTAL * TAX_RATE).toFixed(2));
-const TOTAL_BEFORE_TIP = parseFloat((DISCOUNTED_SUBTOTAL + TAX).toFixed(2));
-
 const TIP_OPTIONS = [
   { label: '15%', rate: 0.15 },
   { label: '18%', rate: 0.18 },
@@ -45,14 +40,32 @@ type PaymentMethod = 'cash' | 'card' | 'apple_pay';
 
 export default function CheckoutScreen() {
   const router = useRouter();
+  const { cart } = useAppStore();
+  const isDemo = useAuthStore((s) => s.isDemo);
   const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(true);
   const [selectedTip, setSelectedTip] = useState(1); // 18% index
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('card');
 
+  const displayItems: CartItem[] = useMemo(() => {
+    if (!cart || cart.length === 0) return isDemo ? CART_ITEMS : [];
+    return cart.map((item: any, idx: number) => ({
+      id: item.productId || String(idx),
+      type: (item.type || 'product') as 'service' | 'product',
+      name: item.name || item.title || 'Item',
+      price: item.price || item.charges || 0,
+    }));
+  }, [cart]);
+
+  const subtotal = displayItems.reduce((sum, item) => sum + item.price, 0);
+  const discountAmount = couponApplied ? subtotal * 0.10 : 0;
+  const discountedSubtotal = subtotal - discountAmount;
+  const tax = parseFloat((discountedSubtotal * 0.08).toFixed(2));
+  const totalBeforeTip = parseFloat((discountedSubtotal + tax).toFixed(2));
+
   const tipRate = TIP_OPTIONS[selectedTip].rate;
-  const tipAmount = parseFloat((TOTAL_BEFORE_TIP * tipRate).toFixed(2));
-  const grandTotal = parseFloat((TOTAL_BEFORE_TIP + tipAmount).toFixed(2));
+  const tipAmount = parseFloat((totalBeforeTip * tipRate).toFixed(2));
+  const grandTotal = parseFloat((totalBeforeTip + tipAmount).toFixed(2));
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -83,7 +96,7 @@ export default function CheckoutScreen() {
             </Svg>
             <Text style={styles.cardTitle}>Cart Items</Text>
           </View>
-          {CART_ITEMS.map((item) => (
+          {displayItems.map((item) => (
             <View key={item.id} style={styles.cartRow}>
               <View style={styles.cartItemInfo}>
                 <View style={[styles.typeBadge, item.type === 'service' ? styles.typeBadgeService : styles.typeBadgeProduct]}>
@@ -149,22 +162,22 @@ export default function CheckoutScreen() {
           <View style={styles.breakdownBody}>
             <View style={styles.breakdownRow}>
               <Text style={styles.breakdownLabel}>Subtotal</Text>
-              <Text style={styles.breakdownValue}>${SUBTOTAL.toFixed(2)}</Text>
+              <Text style={styles.breakdownValue}>${subtotal.toFixed(2)}</Text>
             </View>
             {couponApplied && (
               <View style={styles.breakdownRow}>
                 <Text style={styles.breakdownLabelDiscount}>Discount</Text>
-                <Text style={styles.breakdownValueDiscount}>-${DISCOUNT_AMOUNT.toFixed(2)}</Text>
+                <Text style={styles.breakdownValueDiscount}>-${discountAmount.toFixed(2)}</Text>
               </View>
             )}
             <View style={styles.breakdownRow}>
               <Text style={styles.breakdownLabel}>Tax (8%)</Text>
-              <Text style={styles.breakdownValue}>${TAX.toFixed(2)}</Text>
+              <Text style={styles.breakdownValue}>${tax.toFixed(2)}</Text>
             </View>
             <View style={styles.breakdownDivider} />
             <View style={styles.breakdownRow}>
               <Text style={styles.breakdownTotalLabel}>Total</Text>
-              <Text style={styles.breakdownTotalValue}>${TOTAL_BEFORE_TIP.toFixed(2)}</Text>
+              <Text style={styles.breakdownTotalValue}>${totalBeforeTip.toFixed(2)}</Text>
             </View>
           </View>
         </View>

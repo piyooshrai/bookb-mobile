@@ -175,11 +175,12 @@ export default function ClientNotesScreen() {
   );
 
   const clients = useMemo(() => {
-    if (isDemo || !apiData) return MOCK_CLIENTS;
+    if (isDemo) return MOCK_CLIENTS;
+    if (!apiData) return [];
     const rawResult = Array.isArray(apiData) ? apiData : (apiData as any)?.result ?? [];
-    if (!Array.isArray(rawResult) || rawResult.length === 0) return MOCK_CLIENTS;
+    if (!Array.isArray(rawResult) || rawResult.length === 0) return [];
     const derived = buildClientsFromAppointments(rawResult);
-    return derived.length > 0 ? derived : MOCK_CLIENTS;
+    return derived;
   }, [isDemo, apiData]);
 
   return (
@@ -192,6 +193,12 @@ export default function ClientNotesScreen() {
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         {!isDemo && isLoading && (
           <ActivityIndicator size="small" color={colors.gold} style={{ marginVertical: 12 }} />
+        )}
+
+        {clients.length === 0 && !isLoading && (
+          <View style={{ backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 24, alignItems: 'center' }}>
+            <Text style={{ fontFamily: fontFamilies.body, fontSize: 14, color: colors.textTertiary, textAlign: 'center' }}>No client history yet. Clients will appear here after appointments.</Text>
+          </View>
         )}
 
         {clients.map((client) => (

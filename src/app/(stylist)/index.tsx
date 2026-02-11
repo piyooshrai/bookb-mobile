@@ -41,34 +41,38 @@ export default function MyDayScreen() {
   const dayAppts = Array.isArray(dayAppointments) ? dayAppointments : (dayAppointments as any)?.result ?? [];
 
   // Map API data to timeline format
-  const timeline = !isDemo && dayAppts.length > 0
-    ? dayAppts.map((apt: any, i: number) => ({
-        id: apt.id || String(i),
-        time: apt.startTime,
-        client: apt.userName,
-        service: apt.service || apt.description,
-        duration: apt.startTime && apt.endTime ? `${apt.startTime} - ${apt.endTime}` : '',
-        price: apt.price || 0,
-        status: mapApiStatus(apt.status),
-      }))
-    : MOCK_TIMELINE;
+  const timeline = isDemo
+    ? MOCK_TIMELINE
+    : dayAppts.length > 0
+      ? dayAppts.map((apt: any, i: number) => ({
+          id: apt.id || String(i),
+          time: apt.startTime,
+          client: apt.userName,
+          service: apt.service || apt.description,
+          duration: apt.startTime && apt.endTime ? `${apt.startTime} - ${apt.endTime}` : '',
+          price: apt.price || 0,
+          status: mapApiStatus(apt.status),
+        }))
+      : [];
 
   // Build day stats from API or mock
-  const dayStats = !isDemo && dayAppts.length > 0
-    ? {
-        totalBookings: dayAppts.length,
-        completed: dayAppts.filter((a: any) => a.status === 'completed').length,
-        revenue: dayAppts.filter((a: any) => a.status === 'completed').reduce((sum: number, a: any) => sum + (a.price || 0), 0),
-        nextBreak: '--',
-      }
-    : !isDemo && generalCount
+  const dayStats = isDemo
+    ? MOCK_DAY_STATS
+    : dayAppts.length > 0
       ? {
-          totalBookings: (generalCount as any)?.appointments ?? MOCK_DAY_STATS.totalBookings,
-          completed: (generalCount as any)?.completed ?? MOCK_DAY_STATS.completed,
-          revenue: (generalCount as any)?.revenue ?? MOCK_DAY_STATS.revenue,
-          nextBreak: MOCK_DAY_STATS.nextBreak,
+          totalBookings: dayAppts.length,
+          completed: dayAppts.filter((a: any) => a.status === 'completed').length,
+          revenue: dayAppts.filter((a: any) => a.status === 'completed').reduce((sum: number, a: any) => sum + (a.price || 0), 0),
+          nextBreak: '--',
         }
-      : MOCK_DAY_STATS;
+      : generalCount
+        ? {
+            totalBookings: (generalCount as any)?.appointments ?? 0,
+            completed: (generalCount as any)?.completed ?? 0,
+            revenue: (generalCount as any)?.revenue ?? 0,
+            nextBreak: '--',
+          }
+        : { totalBookings: 0, completed: 0, revenue: 0, nextBreak: '--' };
 
   // Next appointment card - use latest appointment from API or derive from timeline
   const nextAptFromApi = !isDemo && latestApt
@@ -142,6 +146,11 @@ export default function MyDayScreen() {
               <Text style={styles.cardTitle}>Today's Timeline</Text>
             </View>
           </View>
+          {timeline.length === 0 && !isLoading && (
+            <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+              <Text style={{ fontFamily: fontFamilies.body, fontSize: 14, color: colors.textTertiary, textAlign: 'center' }}>No appointments scheduled for today.</Text>
+            </View>
+          )}
           {timeline.map((apt: any, i: number) => (
             <View key={apt.id} style={styles.tlRow}>
               <View style={styles.tlLeft}>
