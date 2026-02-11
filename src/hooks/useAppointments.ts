@@ -26,7 +26,13 @@ export function useDashboardAppointments(data: GetAppointmentsRequest, enabled =
     queryKey: ['appointments', 'dashboard', data],
     queryFn: async () => {
       const res = await appointmentsApi.getFromDashboard(data);
-      console.log('[useDashboardAppts] full res keys:', Object.keys(res), 'res.data type:', typeof res.data, 'res.result type:', typeof (res as any).result, 'raw:', JSON.stringify(res).slice(0, 500));
+      console.log('[useDashboardAppts] query body:', JSON.stringify(data));
+      console.log('[useDashboardAppts] response:', JSON.stringify(res).slice(0, 500));
+      // Diagnostic: broad query with no stylist and wide date range
+      try {
+        const broad = await appointmentsApi.getFromDashboard({ salon: data.salon, fromDate: '2026-01-01', toDate: '2026-12-31', offset: data.offset });
+        console.log('[useDashboardAppts] BROAD (no stylist, year):', JSON.stringify(broad).slice(0, 800));
+      } catch (e: any) { console.log('[useDashboardAppts] BROAD error:', e.message); }
       return res.data ?? (res as any).result ?? null;
     },
     enabled,
