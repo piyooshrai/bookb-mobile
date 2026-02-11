@@ -39,7 +39,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   isDemo: false,
 
   setUser: (user) => {
-    const salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || null;
+    let salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || null;
+    if (!salonId && user.role === 'salon') salonId = user._id;
     const stylistId = typeof user.stylist === 'string' ? user.stylist : user.stylist?._id || null;
     set({ user, salonId, stylistId });
   },
@@ -56,7 +57,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async ({ user, token, role, isFirstLogin = false }) => {
     await SecureStore.setItemAsync(TOKEN_KEY, token);
-    const salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || null;
+    let salonId = typeof user.salon === 'string' ? user.salon : user.salon?._id || null;
+    // For salon role, the user's own _id IS the salon ID
+    if (!salonId && role === 'salon') salonId = user._id;
     const stylistId = typeof user.stylist === 'string' ? user.stylist : user.stylist?._id || null;
     set({
       user,

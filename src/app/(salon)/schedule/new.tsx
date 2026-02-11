@@ -92,7 +92,7 @@ const UNAVAILABLE_SLOTS = ['10:00 AM', '10:30 AM', '1:00 PM', '3:30 PM', '5:30 P
 export default function NewAppointmentScreen() {
   const router = useRouter();
   const isDemo = useAuthStore((s) => s.isDemo);
-  const salonId = useAuthStore((s) => s.salonId);
+  const salonId = useAuthStore((s) => s.salonId || (s.role === 'salon' ? s.user?._id : null));
 
   const createAppointmentMutation = useCreateAppointment();
   const { data: serviceGroupsData } = useServiceGroups();
@@ -468,7 +468,7 @@ export default function NewAppointmentScreen() {
             if (missing.length > 0) {
               console.warn('[NewAppt] Validation failed:', { selectedService, selectedStylist, selectedTime });
               console.warn('[NewAppt] displayServices count:', displayServices.length, 'ids:', displayServices.map((s) => s.id));
-              Alert.alert('Validation', `Please select a ${missing.join(', ')}\n\n(Debug: svc=${JSON.stringify(selectedService)}, sty=${JSON.stringify(selectedStylist)}, time=${JSON.stringify(selectedTime)}, services=${displayServices.length})`);
+              Alert.alert('Validation', `Please select a ${missing.join(', ')}`);
               return;
             }
             const selectedDayObj = DAYS[parseInt(selectedDay.replace('day-', ''))];
