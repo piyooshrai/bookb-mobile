@@ -9,7 +9,7 @@ export function useSalonAnalytics(type: 'monthly' | 'yearly' = 'monthly') {
     queryKey: ['salon', 'analytics', salonId, type],
     queryFn: async () => {
       const res = await salonApi.getAnalytics(salonId!, type);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!salonId,
   });
@@ -22,7 +22,7 @@ export function useSalonGenderReport(type: 'monthly' | 'yearly' = 'monthly') {
     queryKey: ['salon', 'gender', salonId, type],
     queryFn: async () => {
       const res = await salonApi.getGenderReport(salonId!, type);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!salonId,
   });
@@ -35,7 +35,7 @@ export function useSalonAppointmentsByMonth() {
     queryKey: ['salon', 'appointmentsByMonth', salonId],
     queryFn: async () => {
       const res = await salonApi.getAppointmentsByMonth(salonId!);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!salonId,
   });
@@ -46,7 +46,7 @@ export function useEnabledSalons() {
     queryKey: ['salons', 'enabled'],
     queryFn: async () => {
       const res = await salonApi.getEnabledSalons();
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -56,7 +56,7 @@ export function useSalonList(params: { pageNumber: number; pageSize: number; fil
     queryKey: ['salons', 'list', params],
     queryFn: async () => {
       const res = await salonApi.getSalons(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }

@@ -7,7 +7,7 @@ export function useActiveCoupons() {
     queryKey: ['coupons', 'active'],
     queryFn: async () => {
       const res = await couponsApi.getActiveCoupons();
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -17,7 +17,7 @@ export function useSalonCoupons(params: { pageNumber: number; pageSize: number }
     queryKey: ['coupons', 'salon', params],
     queryFn: async () => {
       const res = await couponsApi.getCoupons(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -56,7 +56,7 @@ export function useAdminCoupons() {
     queryKey: ['coupons', 'admin'],
     queryFn: async () => {
       const res = await couponsApi.getAdminCoupons();
-      return res.data;
+      return res.data ?? null;
     },
   });
 }

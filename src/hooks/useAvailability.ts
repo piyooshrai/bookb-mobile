@@ -7,7 +7,7 @@ export function useAvailabilityByRange(data: AvailabilityRangeRequest, enabled =
     queryKey: ['availability', 'range', data],
     queryFn: async () => {
       const res = await availabilityApi.getByRange(data);
-      return res.data;
+      return res.data ?? null;
     },
     enabled,
   });
@@ -18,7 +18,7 @@ export function useBusinessHours(stylistId?: string) {
     queryKey: ['availability', 'businessHours', stylistId],
     queryFn: async () => {
       const res = await availabilityApi.getBusinessHours(stylistId);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -28,7 +28,7 @@ export function useBlockStatus(date: string, offset: number, stylistId?: string,
     queryKey: ['availability', 'blockStatus', date, stylistId],
     queryFn: async () => {
       const res = await availabilityApi.getBlockStatus(date, offset, stylistId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled,
   });
@@ -39,7 +39,7 @@ export function useTodayActivity(data: TodayActivityRequest, offset: number, ena
     queryKey: ['availability', 'today', data],
     queryFn: async () => {
       const res = await availabilityApi.getTodayActivity(data, offset);
-      return res.data;
+      return res.data ?? null;
     },
     enabled,
   });
@@ -74,7 +74,7 @@ export function useMobileAvailability(date: string, enabled = true) {
     queryKey: ['availability', 'mobile', date],
     queryFn: async () => {
       const res = await availabilityApi.getForMobile(date);
-      return res.data;
+      return res.data ?? null;
     },
     enabled,
   });

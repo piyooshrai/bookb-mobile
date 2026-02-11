@@ -7,7 +7,7 @@ export function useEnabledStylists() {
     queryKey: ['stylists', 'enabled'],
     queryFn: async () => {
       const res = await stylistApi.getEnabled();
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -17,7 +17,7 @@ export function useStylistsBySalon(filterValue?: string) {
     queryKey: ['stylists', 'bySalon', filterValue],
     queryFn: async () => {
       const res = await stylistApi.getBySalon(filterValue);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -29,7 +29,7 @@ export function useStylistDayAppointments(date: string, enabled = true) {
     queryKey: ['stylist', 'dayAppointments', user?._id, date],
     queryFn: async () => {
       const res = await stylistApi.getDayWiseAppointments(user!._id, date);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!user?._id && enabled,
   });
@@ -42,7 +42,7 @@ export function useStylistAnalytics(type: 'monthly' | 'yearly' = 'monthly') {
     queryKey: ['stylist', 'analytics', user?._id, type],
     queryFn: async () => {
       const res = await stylistApi.getAnalytics(user!._id, type);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!user?._id,
   });
@@ -55,7 +55,7 @@ export function useStylistLatestAppointment() {
     queryKey: ['stylist', 'latest', user?._id],
     queryFn: async () => {
       const res = await stylistApi.getLatestAppointment(user!._id);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!user?._id,
   });
@@ -68,7 +68,7 @@ export function useStylistAppointmentsByMonth() {
     queryKey: ['stylist', 'appointmentsByMonth', user?._id],
     queryFn: async () => {
       const res = await stylistApi.getAppointmentsByMonth(user!._id);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!user?._id,
   });
@@ -81,7 +81,7 @@ export function useStylistGenderReport(type: 'monthly' | 'yearly' = 'monthly') {
     queryKey: ['stylist', 'gender', user?._id, type],
     queryFn: async () => {
       const res = await stylistApi.getGenderReport(user!._id, type);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!user?._id,
   });
@@ -104,7 +104,7 @@ export function useStylistNote(userId: string, enabled = true) {
     queryKey: ['stylist', 'notes', userId],
     queryFn: async () => {
       const res = await stylistApi.getNote(userId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!userId && enabled,
   });
@@ -115,7 +115,7 @@ export function useStylistSettings(stylistId: string, enabled = true) {
     queryKey: ['stylist', 'settings', stylistId],
     queryFn: async () => {
       const res = await stylistApi.getSettings(stylistId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!stylistId && enabled,
   });
