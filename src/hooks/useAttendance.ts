@@ -7,7 +7,7 @@ export function useTodayAttendance(offset: number) {
     queryKey: ['attendance', 'today', offset],
     queryFn: async () => {
       const res = await attendanceApi.getTodayBySalon(offset);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -17,7 +17,7 @@ export function useAttendanceHistory(params: { pageNumber: number; pageSize: num
     queryKey: ['attendance', 'history', params],
     queryFn: async () => {
       const res = await attendanceApi.getHistoryBySalon(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -39,7 +39,7 @@ export function useUserAttendance(params: { pageNumber: number; pageSize: number
     queryKey: ['attendance', 'user', params],
     queryFn: async () => {
       const res = await attendanceApi.getByUser(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }

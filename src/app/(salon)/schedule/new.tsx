@@ -108,10 +108,6 @@ export default function NewAppointmentScreen() {
   const apiServices = useMemo(() => {
     if (isDemo || !serviceGroupsData) return SERVICES;
     const groups = Array.isArray(serviceGroupsData) ? serviceGroupsData : (serviceGroupsData as any)?.result || (serviceGroupsData as any)?.serviceGroups || [];
-    // Log raw data shape for debugging
-    if (groups.length > 0) {
-      console.log('[NewAppt] Raw service group[0]:', JSON.stringify(groups[0]).slice(0, 500));
-    }
     const flat: { id: string; name: string; duration: string; price: number; category: string; mainServiceId: string }[] = [];
     groups.forEach((group: any) => {
       const mainSvc = group.mainService || group.category;
@@ -143,20 +139,12 @@ export default function NewAppointmentScreen() {
         });
       }
     });
-    if (flat.length > 0) {
-      console.log('[NewAppt] Mapped services:', flat.length, 'first id:', flat[0].id);
-    } else {
-      console.warn('[NewAppt] No services extracted from API, falling back to mock');
-    }
     return flat.length > 0 ? flat : SERVICES.map((s) => ({ ...s, mainServiceId: '' }));
   }, [isDemo, serviceGroupsData]);
 
   const apiStylists = useMemo(() => {
     if (isDemo || !stylistsData) return STYLISTS;
     const list = Array.isArray(stylistsData) ? stylistsData : (stylistsData as any)?.result || (stylistsData as any)?.users || (stylistsData as any)?.stylists || [];
-    if (list.length > 0) {
-      console.log('[NewAppt] Raw stylist[0]:', JSON.stringify(list[0]).slice(0, 300));
-    }
     const mapped = list
       .map((s: any) => ({
         id: extractId(s),
@@ -184,13 +172,11 @@ export default function NewAppointmentScreen() {
   const prevStylistsRef = useMemo(() => displayStylists.map((s: any) => s.id).join(','), [displayStylists]);
   useEffect(() => {
     if (selectedService && !displayServices.find((s) => s.id === selectedService)) {
-      console.log('[NewAppt] Clearing stale service selection:', selectedService);
       setSelectedService(null);
     }
   }, [prevServicesRef]);
   useEffect(() => {
     if (selectedStylist && !displayStylists.find((s: any) => s.id === selectedStylist)) {
-      console.log('[NewAppt] Clearing stale stylist selection:', selectedStylist);
       setSelectedStylist(null);
     }
   }, [prevStylistsRef]);
@@ -306,7 +292,7 @@ export default function NewAppointmentScreen() {
             <TouchableOpacity
               key={service.id}
               style={[styles.serviceRow, selectedService === service.id && styles.serviceRowActive]}
-              onPress={() => { console.log('[NewAppt] Service tapped:', service.id, service.name); setSelectedService(service.id); }}
+              onPress={() => setSelectedService(service.id)}
               activeOpacity={0.7}
             >
               <View style={styles.radioOuter}>
@@ -457,7 +443,6 @@ export default function NewAppointmentScreen() {
           activeOpacity={0.8}
           disabled={createAppointmentMutation.isPending}
           onPress={() => {
-            console.log('[NewAppt] salonId:', salonId, 'isDemo:', isDemo);
             if (isDemo) {
               Alert.alert('Success', 'Appointment booked', [{ text: 'OK', onPress: () => router.back() }]);
               return;
@@ -467,8 +452,6 @@ export default function NewAppointmentScreen() {
             if (!selectedStylist) missing.push('stylist');
             if (!selectedTime) missing.push('time');
             if (missing.length > 0) {
-              console.warn('[NewAppt] Validation failed:', { selectedService, selectedStylist, selectedTime });
-              console.warn('[NewAppt] displayServices count:', displayServices.length, 'ids:', displayServices.map((s) => s.id));
               Alert.alert('Validation', `Please select a ${missing.join(', ')}`);
               return;
             }
@@ -487,20 +470,6 @@ export default function NewAppointmentScreen() {
             const time24 = `${String(hour24).padStart(2, '0')}:${timeMatch ? timeMatch[2] : '00'}`;
 
             const svc = displayServices.find((s) => s.id === selectedService);
-            const requestPayload = {
-                data: {
-                  appointmentDate,
-                  timeData: { timeAsADate: time24, timeAsAString: selectedTime!, id: '' },
-                  salon: salonId || '',
-                  stylistId: selectedStylist!,
-                  mainService: svc?.mainServiceId || selectedService!,
-                  subService: selectedService!,
-                  comment: notes,
-                  requiredDuration: parseInt(svc?.duration || '60') || 60,
-                },
-                offset: new Date().getTimezoneOffset(),
-            };
-            console.log('[NewAppt] Creating appointment:', JSON.stringify(requestPayload));
             createAppointmentMutation.mutate(
               {
                 data: {

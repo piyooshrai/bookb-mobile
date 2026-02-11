@@ -7,7 +7,7 @@ export function useProductCategories() {
     queryKey: ['products', 'categories'],
     queryFn: async () => {
       const res = await productsApi.getEnabledCategories();
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -17,7 +17,7 @@ export function useProductsBySalon(params: { pageNumber: number; pageSize: numbe
     queryKey: ['products', 'bySalon', params],
     queryFn: async () => {
       const res = await productsApi.getBySalon(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -27,7 +27,7 @@ export function useProductsForMobile() {
     queryKey: ['products', 'mobile'],
     queryFn: async () => {
       const res = await productsApi.getBySalonForMobile();
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -37,7 +37,7 @@ export function useProductDetail(productId: string, enabled = true) {
     queryKey: ['products', 'detail', productId],
     queryFn: async () => {
       const res = await productsApi.getById(productId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!productId && enabled,
   });
@@ -48,7 +48,7 @@ export function useSimilarProducts(productId: string, enabled = true) {
     queryKey: ['products', 'similar', productId],
     queryFn: async () => {
       const res = await productsApi.getSimilar(productId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!productId && enabled,
   });
@@ -70,7 +70,7 @@ export function useOrdersByUser(params: { pageNumber: number; pageSize: number }
     queryKey: ['orders', 'byUser', params],
     queryFn: async () => {
       const res = await productsApi.getOrdersByUser(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -80,7 +80,7 @@ export function useOrdersBySalon(params: { pageNumber: number; pageSize: number 
     queryKey: ['orders', 'bySalon', params],
     queryFn: async () => {
       const res = await productsApi.getOrdersBySalon(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }

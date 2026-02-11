@@ -82,7 +82,7 @@ export function useGetUserByToken() {
         setRole(res.data.role);
       }
       setLoading(false);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!token,
     retry: false,
@@ -129,7 +129,7 @@ export function useRewardInfo(enabled = true) {
     queryKey: ['rewards'],
     queryFn: async () => {
       const res = await authApi.getRewardInfo();
-      return res.data;
+      return res.data ?? null;
     },
     enabled,
   });
@@ -140,7 +140,7 @@ export function useUsers(params: { pageNumber: number; pageSize: number; filterV
     queryKey: ['users', params],
     queryFn: async () => {
       const res = await authApi.getUsers(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }

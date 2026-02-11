@@ -26,7 +26,7 @@ export function useDashboardAppointments(data: GetAppointmentsRequest, enabled =
     queryKey: ['appointments', 'dashboard', data],
     queryFn: async () => {
       const res = await appointmentsApi.getFromDashboard(data);
-      return res.data ?? (res as any).result;
+      return res.data ?? (res as any).result ?? null;
     },
     enabled,
   });
@@ -37,7 +37,7 @@ export function useAvailableSlots(data: AvailableSlotsRequest, offset: number, e
     queryKey: ['appointments', 'slots', data],
     queryFn: async () => {
       const res = await appointmentsApi.getAvailableByDate(data, offset);
-      return res.data;
+      return res.data ?? null;
     },
     enabled,
   });
@@ -82,7 +82,7 @@ export function useAppointmentDetail(appointmentId: string, enabled = true) {
     queryKey: ['appointments', 'detail', appointmentId],
     queryFn: async () => {
       const res = await appointmentsApi.getDetail(appointmentId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!appointmentId && enabled,
   });
@@ -93,7 +93,7 @@ export function useLatestAppointment() {
     queryKey: ['appointments', 'latest'],
     queryFn: async () => {
       const res = await appointmentsApi.getLatestByUser();
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -103,7 +103,7 @@ export function useUserActivity(params: { pageNumber: number; pageSize: number; 
     queryKey: ['appointments', 'activity', params],
     queryFn: async () => {
       const res = await appointmentsApi.getUserActivity(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -113,7 +113,7 @@ export function useAppointmentHistory(params: { pageNumber: number; pageSize: nu
     queryKey: ['appointments', 'history', params],
     queryFn: async () => {
       const res = await appointmentsApi.getHistoryByUser(params);
-      return res.data;
+      return res.data ?? null;
     },
     enabled,
   });
@@ -124,7 +124,7 @@ export function useAppointmentsByStylist(params: { pageNumber: number; pageSize:
     queryKey: ['appointments', 'byStylist', params],
     queryFn: async () => {
       const res = await appointmentsApi.getByStylist(params);
-      return res.data;
+      return res.data ?? null;
     },
     enabled,
   });
@@ -135,7 +135,7 @@ export function useAppointmentMetrics(salonId: string) {
     queryKey: ['appointments', 'conversion', salonId],
     queryFn: async () => {
       const res = await appointmentsApi.getConversionRate(salonId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!salonId,
   });
@@ -144,7 +144,7 @@ export function useAppointmentMetrics(salonId: string) {
     queryKey: ['appointments', 'retention', salonId],
     queryFn: async () => {
       const res = await appointmentsApi.getRetentionRate(salonId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!salonId,
   });
@@ -153,7 +153,7 @@ export function useAppointmentMetrics(salonId: string) {
     queryKey: ['appointments', 'avgTicket', salonId],
     queryFn: async () => {
       const res = await appointmentsApi.getAverageTicketValue(salonId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!salonId,
   });

@@ -61,7 +61,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     // For salon role, the user's own _id IS the salon ID
     if (!salonId && role === 'salon') salonId = user._id;
     const stylistId = typeof user.stylist === 'string' ? user.stylist : (user.stylist as any)?._id || null;
-    console.log('[Auth] login - role:', role, 'user.salon:', JSON.stringify(user.salon), 'derived salonId:', salonId, 'user._id:', user._id);
     set({
       user,
       token,

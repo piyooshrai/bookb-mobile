@@ -7,7 +7,7 @@ export function useServiceGroups() {
     queryKey: ['services', 'grouped'],
     queryFn: async () => {
       const res = await servicesApi.getGrouped();
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -17,7 +17,7 @@ export function useServiceGroupsBySalon(salonId: string, enabled = true) {
     queryKey: ['services', 'grouped', salonId],
     queryFn: async () => {
       const res = await servicesApi.getGroupedByCategorySalon(salonId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!salonId && enabled,
   });
@@ -28,7 +28,7 @@ export function useEnabledMainServices() {
     queryKey: ['services', 'main', 'enabled'],
     queryFn: async () => {
       const res = await servicesApi.getEnabledMainServices();
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -38,7 +38,7 @@ export function useEnabledSubServices(mainServiceId: string, enabled = true) {
     queryKey: ['services', 'sub', mainServiceId],
     queryFn: async () => {
       const res = await servicesApi.getEnabledSubServices(mainServiceId);
-      return res.data;
+      return res.data ?? null;
     },
     enabled: !!mainServiceId && enabled,
   });

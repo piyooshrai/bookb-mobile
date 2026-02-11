@@ -6,7 +6,7 @@ export function useNotifications(params: { pageNumber: number; pageSize: number 
     queryKey: ['notifications', params],
     queryFn: async () => {
       const res = await notificationsApi.getAll(params);
-      return res.data;
+      return res.data ?? null;
     },
   });
 }
@@ -16,7 +16,7 @@ export function useUserNotifications(params: { pageNumber: number; pageSize: num
     queryKey: ['notifications', 'user', params],
     queryFn: async () => {
       const res = await notificationsApi.getForUser(params);
-      return res.data;
+      return res.data ?? null;
     },
     enabled,
   });
