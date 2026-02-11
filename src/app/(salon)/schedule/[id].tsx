@@ -1,9 +1,10 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Circle, Line, Rect } from 'react-native-svg';
 import { useAuthStore } from '@/stores/authStore';
-import { useChangeAppointmentStatus } from '@/hooks/useAppointments';
+import { useChangeAppointmentStatus, useAppointmentDetail } from '@/hooks/useAppointments';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -50,7 +51,37 @@ export default function AppointmentDetailScreen() {
   const { id } = useLocalSearchParams();
   const isDemo = useAuthStore((s) => s.isDemo);
   const changeStatusMutation = useChangeAppointmentStatus();
-  const apt = MOCK_APPOINTMENT;
+  const { data: aptData, isLoading: aptLoading } = useAppointmentDetail(id as string, !isDemo);
+
+  const apt = useMemo(() => {
+    if (isDemo) return MOCK_APPOINTMENT;
+    if (!aptData) return null;
+    const raw = (aptData as any)?.result || aptData;
+    const a = Array.isArray(raw) ? raw[0] : raw;
+    if (!a) return null;
+    const userName = typeof a.user === 'object' ? a.user?.name : 'Client';
+    const initials = userName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+    return {
+      id: a._id || id,
+      status: (a.status === 'complete' ? 'Completed' : a.status === 'pending' ? 'Pending' : a.status === 'cancel' ? 'Cancelled' : 'Confirmed') as any,
+      client: {
+        name: userName,
+        initials,
+        phone: typeof a.user === 'object' ? (a.user?.phone || '') : '',
+        email: typeof a.user === 'object' ? (a.user?.email || '') : '',
+        visits: 0,
+      },
+      service: typeof a.subService === 'object' ? (a.subService?.title || 'Service') : (typeof a.mainService === 'object' ? (a.mainService?.title || 'Service') : 'Service'),
+      duration: a.requiredDuration ? `${a.requiredDuration} min` : '60 min',
+      stylist: typeof a.stylist === 'object' ? (a.stylist?.name || 'Stylist') : 'Stylist',
+      date: a.dateAsAString || a.appointmentDate || '',
+      time: a.timeAsAString || a.timeData?.timeAsAString || '',
+      price: typeof a.subService === 'object' ? (a.subService?.charges ?? 0) : (typeof a.mainService === 'object' ? (a.mainService?.charges ?? 0) : 0),
+      notes: a.comment || '',
+      payment: { subtotal: 0, tax: 0, total: 0, method: 'N/A' },
+      history: [],
+    };
+  }, [isDemo, aptData, id]);
 
   const handleStatusChange = (newStatus: string) => {
     if (isDemo) {
@@ -88,7 +119,19 @@ export default function AppointmentDetailScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+      {!isDemo && aptLoading && (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={colors.gold} />
+        </View>
+      )}
+
+      {!isDemo && !aptLoading && !apt && (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 }}>
+          <Text style={{ fontFamily: fontFamilies.body, fontSize: 14, color: colors.textSecondary }}>Appointment not found</Text>
+        </View>
+      )}
+
+      {apt && <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         {/* Status Badge */}
         <View style={styles.statusRow}>
           <View style={styles.statusBadge}>
@@ -261,7 +304,7 @@ export default function AppointmentDetailScreen() {
         </View>
 
         <View style={styles.bottomSpacer} />
-      </ScrollView>
+      </ScrollView>}
     </SafeAreaView>
   );
 }

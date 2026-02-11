@@ -46,49 +46,64 @@ export default function AdminDashboard() {
   const { data: salonChartData, isLoading: chartLoading } = useAdminSalonChart();
   const { data: subscriptionData, isLoading: subLoading } = useAdminSubscription();
 
-  // Map API data to platform stats (fallback to mock when demo or no data)
+  // Map API data to platform stats (demo → mock, non-demo → API data or zeros)
   const db = dashboardData as any;
-  const platformStats = !isDemo && db
-    ? {
-        totalSalons: db.totalSalons ?? MOCK_PLATFORM_STATS.totalSalons,
-        activeSalons: db.activeSalons ?? MOCK_PLATFORM_STATS.activeSalons,
-        totalUsers: db.totalUsers ?? MOCK_PLATFORM_STATS.totalUsers,
-        totalStylists: db.totalStylists ?? MOCK_PLATFORM_STATS.totalStylists,
-        monthlyRevenue: db.monthlyRevenue ?? MOCK_PLATFORM_STATS.monthlyRevenue,
-        activeSubscriptions: db.activeSubscriptions ?? MOCK_PLATFORM_STATS.activeSubscriptions,
-        newSignupsThisWeek: db.newSignupsThisWeek ?? MOCK_PLATFORM_STATS.newSignupsThisWeek,
-        appointmentsToday: db.appointmentsToday ?? MOCK_PLATFORM_STATS.appointmentsToday,
-      }
-    : MOCK_PLATFORM_STATS;
+  const platformStats = isDemo
+    ? MOCK_PLATFORM_STATS
+    : db
+      ? {
+          totalSalons: db.totalSalons ?? 0,
+          activeSalons: db.activeSalons ?? 0,
+          totalUsers: db.totalUsers ?? 0,
+          totalStylists: db.totalStylists ?? 0,
+          monthlyRevenue: db.monthlyRevenue ?? 0,
+          activeSubscriptions: db.activeSubscriptions ?? 0,
+          newSignupsThisWeek: db.newSignupsThisWeek ?? 0,
+          appointmentsToday: db.appointmentsToday ?? 0,
+        }
+      : {
+          totalSalons: 0,
+          activeSalons: 0,
+          totalUsers: 0,
+          totalStylists: 0,
+          monthlyRevenue: 0,
+          activeSubscriptions: 0,
+          newSignupsThisWeek: 0,
+          appointmentsToday: 0,
+        };
 
-  // Map API subscription data to plan breakdown (fallback to mock when demo or no data)
-  const planBreakdown = !isDemo && subscriptionData && Array.isArray(subscriptionData)
-    ? subscriptionData.map((item: { plan: string; count: number }, i: number) => ({
-        plan: item.plan ?? MOCK_PLAN_BREAKDOWN[i]?.plan ?? 'Unknown',
-        count: item.count ?? 0,
-        color: item.plan === 'Professional'
-          ? colors.gold
-          : item.plan === 'Enterprise'
-            ? colors.navy
-            : item.plan === 'Trial'
-              ? colors.textTertiary
-              : colors.info,
-      }))
-    : MOCK_PLAN_BREAKDOWN;
+  // Map API subscription data to plan breakdown (demo → mock, non-demo → API data or empty)
+  const planBreakdown = isDemo
+    ? MOCK_PLAN_BREAKDOWN
+    : subscriptionData && Array.isArray(subscriptionData)
+      ? subscriptionData.map((item: { plan: string; count: number }, i: number) => ({
+          plan: item.plan ?? 'Unknown',
+          count: item.count ?? 0,
+          color: item.plan === 'Professional'
+            ? colors.gold
+            : item.plan === 'Enterprise'
+              ? colors.navy
+              : item.plan === 'Trial'
+                ? colors.textTertiary
+                : colors.info,
+        }))
+      : [];
 
-  // Map API salon chart data to top salons (fallback to mock when demo or no data)
-  const topSalons = !isDemo && salonChartData && Array.isArray(salonChartData)
-    ? salonChartData.map((salon: { _id?: string; name: string; revenue: number; appointments: number; rating: number }, i: number) => ({
-        id: salon._id ?? String(i + 1),
-        name: salon.name ?? 'Unknown',
-        revenue: salon.revenue ?? 0,
-        appointments: salon.appointments ?? 0,
-        rating: salon.rating ?? 0,
-      }))
-    : MOCK_TOP_SALONS;
+  // Map API salon chart data to top salons (demo → mock, non-demo → API data or empty)
+  const topSalons = isDemo
+    ? MOCK_TOP_SALONS
+    : salonChartData && Array.isArray(salonChartData)
+      ? salonChartData.map((salon: { _id?: string; name: string; revenue: number; appointments: number; rating: number }, i: number) => ({
+          id: salon._id ?? String(i + 1),
+          name: salon.name ?? 'Unknown',
+          revenue: salon.revenue ?? 0,
+          appointments: salon.appointments ?? 0,
+          rating: salon.rating ?? 0,
+        }))
+      : [];
 
-  // Recent signups always use mock data (no specific API endpoint for recent signups)
-  const recentSignups = MOCK_RECENT_SIGNUPS;
+  // Recent signups: demo → mock, non-demo → empty (no API endpoint for recent signups)
+  const recentSignups = isDemo ? MOCK_RECENT_SIGNUPS : [];
 
   const isApiLoading = !isDemo && (dashboardLoading || chartLoading || subLoading);
 
@@ -164,19 +179,27 @@ export default function AdminDashboard() {
               <Text style={styles.cardTitle}>Plan Breakdown</Text>
             </View>
           </View>
-          <View style={styles.planBar}>
-            {planBreakdown.map((p) => (
-              <View key={p.plan} style={[styles.planSegment, { flex: p.count, backgroundColor: p.color }]} />
-            ))}
-          </View>
-          <View style={styles.planLegend}>
-            {planBreakdown.map((p) => (
-              <View key={p.plan} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: p.color }]} />
-                <Text style={styles.legendText}>{p.plan} ({p.count})</Text>
+          {planBreakdown.length === 0 ? (
+            <View style={{ paddingHorizontal: 16, paddingVertical: 20, alignItems: 'center' }}>
+              <Text style={{ fontFamily: fontFamilies.body, fontSize: 13, color: colors.textTertiary }}>No subscription data available</Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.planBar}>
+                {planBreakdown.map((p) => (
+                  <View key={p.plan} style={[styles.planSegment, { flex: p.count, backgroundColor: p.color }]} />
+                ))}
               </View>
-            ))}
-          </View>
+              <View style={styles.planLegend}>
+                {planBreakdown.map((p) => (
+                  <View key={p.plan} style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: p.color }]} />
+                    <Text style={styles.legendText}>{p.plan} ({p.count})</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
         </View>
 
         {/* Recent Signups */}
@@ -192,25 +215,31 @@ export default function AdminDashboard() {
               <Text style={styles.cardTitle}>Recent Signups</Text>
             </View>
           </View>
-          {recentSignups.map((salon) => (
-            <View key={salon.id} style={styles.signupRow}>
-              <View style={styles.signupAvatar}>
-                <Text style={styles.signupInitial}>{salon.name[0]}</Text>
-              </View>
-              <View style={styles.signupInfo}>
-                <Text style={styles.signupName}>{salon.name}</Text>
-                <Text style={styles.signupLocation}>{salon.location}</Text>
-              </View>
-              <View style={styles.signupRight}>
-                <View style={[styles.planBadge, salon.plan === 'Enterprise' && styles.planEnterprise, salon.plan === 'Professional' && styles.planPro]}>
-                  <Text style={[styles.planBadgeText, salon.plan === 'Enterprise' && styles.planEnterpriseText, salon.plan === 'Professional' && styles.planProText]}>
-                    {salon.plan}
-                  </Text>
-                </View>
-                <Text style={styles.signupDate}>{salon.date}</Text>
-              </View>
+          {recentSignups.length === 0 ? (
+            <View style={{ paddingHorizontal: 16, paddingVertical: 20, alignItems: 'center' }}>
+              <Text style={{ fontFamily: fontFamilies.body, fontSize: 13, color: colors.textTertiary }}>No recent signups</Text>
             </View>
-          ))}
+          ) : (
+            recentSignups.map((salon) => (
+              <View key={salon.id} style={styles.signupRow}>
+                <View style={styles.signupAvatar}>
+                  <Text style={styles.signupInitial}>{salon.name[0]}</Text>
+                </View>
+                <View style={styles.signupInfo}>
+                  <Text style={styles.signupName}>{salon.name}</Text>
+                  <Text style={styles.signupLocation}>{salon.location}</Text>
+                </View>
+                <View style={styles.signupRight}>
+                  <View style={[styles.planBadge, salon.plan === 'Enterprise' && styles.planEnterprise, salon.plan === 'Professional' && styles.planPro]}>
+                    <Text style={[styles.planBadgeText, salon.plan === 'Enterprise' && styles.planEnterpriseText, salon.plan === 'Professional' && styles.planProText]}>
+                      {salon.plan}
+                    </Text>
+                  </View>
+                  <Text style={styles.signupDate}>{salon.date}</Text>
+                </View>
+              </View>
+            ))
+          )}
         </View>
 
         {/* Top Performing Salons */}
@@ -224,16 +253,22 @@ export default function AdminDashboard() {
             </View>
             <Text style={styles.cardSub}>By revenue</Text>
           </View>
-          {topSalons.map((salon, i) => (
-            <View key={salon.id} style={styles.topRow}>
-              <Text style={styles.topRank}>#{i + 1}</Text>
-              <View style={styles.topInfo}>
-                <Text style={styles.topName}>{salon.name}</Text>
-                <Text style={styles.topMeta}>{salon.appointments} appts · {salon.rating} rating</Text>
-              </View>
-              <Text style={styles.topRevenue}>${(salon.revenue / 1000).toFixed(1)}k</Text>
+          {topSalons.length === 0 ? (
+            <View style={{ paddingHorizontal: 16, paddingVertical: 20, alignItems: 'center' }}>
+              <Text style={{ fontFamily: fontFamilies.body, fontSize: 13, color: colors.textTertiary }}>No salon data available</Text>
             </View>
-          ))}
+          ) : (
+            topSalons.map((salon, i) => (
+              <View key={salon.id} style={styles.topRow}>
+                <Text style={styles.topRank}>#{i + 1}</Text>
+                <View style={styles.topInfo}>
+                  <Text style={styles.topName}>{salon.name}</Text>
+                  <Text style={styles.topMeta}>{salon.appointments} appts · {salon.rating} rating</Text>
+                </View>
+                <Text style={styles.topRevenue}>${(salon.revenue / 1000).toFixed(1)}k</Text>
+              </View>
+            ))
+          )}
         </View>
 
         <View style={{ height: 20 }} />

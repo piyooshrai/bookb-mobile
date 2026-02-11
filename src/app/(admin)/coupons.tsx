@@ -90,6 +90,7 @@ export default function AdminCoupons() {
   const { data: adminCouponsData, isLoading } = useAdminCoupons();
 
   // Map API coupon data to display format (separate active vs expired)
+  // Demo → mock data, Non-demo → API data or empty arrays
   const apiCoupons = !isDemo && adminCouponsData && Array.isArray(adminCouponsData)
     ? adminCouponsData.map((coupon: Coupon) => ({
         id: coupon._id,
@@ -107,17 +108,21 @@ export default function AdminCoupons() {
       }))
     : null;
 
-  const activeCoupons = apiCoupons
-    ? apiCoupons.filter((c) => !c.isExpired && c.enable)
-    : MOCK_ACTIVE_COUPONS;
+  const activeCoupons = isDemo
+    ? MOCK_ACTIVE_COUPONS
+    : apiCoupons
+      ? apiCoupons.filter((c) => !c.isExpired && c.enable)
+      : [];
 
-  const expiredCoupons = apiCoupons
-    ? apiCoupons.filter((c) => c.isExpired || !c.enable)
-    : MOCK_EXPIRED_COUPONS;
+  const expiredCoupons = isDemo
+    ? MOCK_EXPIRED_COUPONS
+    : apiCoupons
+      ? apiCoupons.filter((c) => c.isExpired || !c.enable)
+      : [];
 
-  const totalActiveUsage = apiCoupons
-    ? activeCoupons.reduce((sum, c) => sum + c.usageCount, 0)
-    : MOCK_TOTAL_ACTIVE_USAGE;
+  const totalActiveUsage = isDemo
+    ? MOCK_TOTAL_ACTIVE_USAGE
+    : activeCoupons.reduce((sum, c) => sum + c.usageCount, 0);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -143,6 +148,12 @@ export default function AdminCoupons() {
           </View>
           <Text style={styles.sectionCount}>{activeCoupons.length}</Text>
         </View>
+
+        {activeCoupons.length === 0 ? (
+          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+            <Text style={{ fontFamily: fontFamilies.body, fontSize: 13, color: colors.textTertiary }}>No active coupons</Text>
+          </View>
+        ) : null}
 
         {activeCoupons.map((coupon) => {
           const usagePercent = coupon.usageLimit
@@ -225,6 +236,12 @@ export default function AdminCoupons() {
           </View>
           <Text style={styles.sectionCount}>{expiredCoupons.length}</Text>
         </View>
+
+        {expiredCoupons.length === 0 ? (
+          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+            <Text style={{ fontFamily: fontFamilies.body, fontSize: 13, color: colors.textTertiary }}>No expired coupons</Text>
+          </View>
+        ) : null}
 
         {expiredCoupons.map((coupon) => (
           <View key={coupon.id} style={styles.expiredCard}>

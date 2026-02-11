@@ -113,20 +113,22 @@ export default function SalonList() {
 
   const enableDisableMutation = useEnableDisableSalon();
 
-  // Map API salon data to display format
-  const salons = !isDemo && salonListData?.result
-    ? salonListData.result.map((user: User) => ({
-        id: user._id,
-        name: user.name || 'Unknown Salon',
-        location: user.address || 'No location',
-        plan: user.subscription?.[0]?.plan || 'Starter',
-        status: user.active ? ('active' as const) : ('suspended' as const),
-        stylists: user.stylistCount || 0,
-        joinDate: user.createdAt
-          ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          : 'N/A',
-      }))
-    : MOCK_SALONS;
+  // Map API salon data to display format (demo → mock, non-demo → API data or empty)
+  const salons = isDemo
+    ? MOCK_SALONS
+    : salonListData?.result
+      ? salonListData.result.map((user: User) => ({
+          id: user._id,
+          name: user.name || 'Unknown Salon',
+          location: user.address || 'No location',
+          plan: user.subscription?.[0]?.plan || 'Starter',
+          status: user.active ? ('active' as const) : ('suspended' as const),
+          stylists: user.stylistCount || 0,
+          joinDate: user.createdAt
+            ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'N/A',
+        }))
+      : [];
 
   const activeSalons = salons.filter((s) => s.status === 'active').length;
 
@@ -187,6 +189,10 @@ export default function SalonList() {
         {!isDemo && isLoading ? (
           <View style={{ paddingVertical: 32, alignItems: 'center' }}>
             <ActivityIndicator size="large" color={colors.gold} />
+          </View>
+        ) : salons.length === 0 ? (
+          <View style={{ paddingVertical: 32, alignItems: 'center' }}>
+            <Text style={{ fontFamily: fontFamilies.body, fontSize: 14, color: colors.textTertiary }}>No salons found</Text>
           </View>
         ) : (
           salons.map((salon) => {

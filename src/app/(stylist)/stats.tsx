@@ -60,49 +60,68 @@ export default function MyStatsScreen() {
 
   // Map analytics to earnings
   const earningsAmount = useMemo(() => {
-    if (isDemo || !analyticsData) return '$2,840';
+    if (isDemo) return '$2,840';
+    if (!analyticsData) return '$0';
     const unwrappedAnalytics = Array.isArray(analyticsData) ? analyticsData : (analyticsData as any)?.result ?? analyticsData;
     const analytics = Array.isArray(unwrappedAnalytics) ? unwrappedAnalytics[0] : unwrappedAnalytics;
     const sales = (analytics as any)?.totalSales?.value;
     if (sales !== undefined) return `$${Number(sales).toLocaleString()}`;
-    return '$2,840';
+    return '$0';
   }, [isDemo, analyticsData]);
 
   const earningsTrend = useMemo(() => {
-    if (isDemo || !analyticsData) return '+12% vs last month';
+    if (isDemo) return '+12% vs last month';
+    if (!analyticsData) return '--';
     const unwrappedAnalytics2 = Array.isArray(analyticsData) ? analyticsData : (analyticsData as any)?.result ?? analyticsData;
     const analytics = Array.isArray(unwrappedAnalytics2) ? unwrappedAnalytics2[0] : unwrappedAnalytics2;
     const pct = (analytics as any)?.totalSales?.percentage;
     const trend = (analytics as any)?.totalSales?.trend;
     if (pct !== undefined) return `${trend === 'down' ? '-' : '+'}${pct}% vs last period`;
-    return '+12% vs last month';
+    return '--';
   }, [isDemo, analyticsData]);
 
   // Map to mini stats
   const displayMiniStats = useMemo(() => {
-    if (isDemo || !generalCount) return miniStats;
+    if (isDemo) return miniStats;
+    if (!generalCount) return [
+      { label: 'Clients served', value: '0' },
+      { label: 'Avg Rating', value: '--' },
+      { label: 'Appointments', value: '0' },
+    ];
     const rawGc = generalCount as any;
     const gc = Array.isArray(rawGc) ? rawGc[0] : rawGc?.result ? (Array.isArray(rawGc.result) ? rawGc.result[0] : rawGc.result) : rawGc;
     return [
-      { label: 'Clients served', value: gc?.clients?.toString() || gc?.users?.toString() || miniStats[0].value },
-      { label: 'Avg Rating', value: gc?.avgRating?.toString() || miniStats[1].value },
-      { label: 'Appointments', value: gc?.appointments?.toString() || gc?.totalAppointments?.toString() || miniStats[2].value },
+      { label: 'Clients served', value: gc?.clients?.toString() || gc?.users?.toString() || '0' },
+      { label: 'Avg Rating', value: gc?.avgRating?.toString() || '--' },
+      { label: 'Appointments', value: gc?.appointments?.toString() || gc?.totalAppointments?.toString() || '0' },
     ];
   }, [isDemo, generalCount]);
 
   // Map analytics to status breakdown
+  const emptyStatuses = [
+    { label: 'Completed', count: 0, color: colors.success },
+    { label: 'Cancelled', count: 0, color: colors.error },
+    { label: 'No-show', count: 0, color: colors.warning },
+    { label: 'Rescheduled', count: 0, color: colors.info },
+  ];
   const displayStatuses = useMemo(() => {
-    if (isDemo || !analyticsData) return appointmentStatuses;
+    if (isDemo) return appointmentStatuses;
+    if (!analyticsData) return emptyStatuses;
     const unwrappedAnalytics3 = Array.isArray(analyticsData) ? analyticsData : (analyticsData as any)?.result ?? analyticsData;
     const analytics = Array.isArray(unwrappedAnalytics3) ? unwrappedAnalytics3[0] : unwrappedAnalytics3;
     const aptsItem = (analytics as any)?.appointments;
-    if (!aptsItem) return appointmentStatuses;
-    // Use total value from analytics if available, keep mock breakdown structure
-    return appointmentStatuses;
+    if (!aptsItem) return emptyStatuses;
+    // Try to extract status counts from analytics data
+    return [
+      { label: 'Completed', count: aptsItem?.completed ?? aptsItem?.value ?? 0, color: colors.success },
+      { label: 'Cancelled', count: aptsItem?.cancelled ?? 0, color: colors.error },
+      { label: 'No-show', count: aptsItem?.noShow ?? 0, color: colors.warning },
+      { label: 'Rescheduled', count: aptsItem?.rescheduled ?? 0, color: colors.info },
+    ];
   }, [isDemo, analyticsData]);
 
-  // Map to top services (keep mock for now, analytics doesn't break down by service)
-  const displayTopServices = topServices;
+  // Map to top services - only show mock in demo mode
+  const displayTopServices = isDemo ? topServices : [];
 
   const handleLogout = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -190,6 +209,9 @@ export default function MyStatsScreen() {
         {/* Top Services */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Top Services</Text>
+          {displayTopServices.length === 0 && (
+            <Text style={{ fontFamily: fontFamilies.body, fontSize: 14, color: colors.textTertiary, textAlign: 'center', paddingVertical: 12 }}>No service data available yet.</Text>
+          )}
           {displayTopServices.map((service) => (
             <View key={service.rank} style={styles.serviceRow}>
               <View style={styles.serviceRankBadge}>

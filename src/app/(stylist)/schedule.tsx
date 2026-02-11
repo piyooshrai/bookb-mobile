@@ -126,7 +126,8 @@ export default function WeeklyScheduleScreen() {
     return grouped;
   }, [isDemo, apiData]);
 
-  const schedule = apiSchedule || MOCK_SCHEDULE;
+  const emptySchedule: Record<string, Appointment[]> = { Mon: [], Tue: [], Wed: [], Thu: [], Fri: [] };
+  const schedule = apiSchedule || (isDemo ? MOCK_SCHEDULE : emptySchedule);
   const appointments = schedule[DAYS[selectedDay]] || [];
 
   const handleAccept = (apt: Appointment) => {
@@ -168,6 +169,12 @@ export default function WeeklyScheduleScreen() {
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
         {!isDemo && isLoading && (
           <ActivityIndicator size="small" color={colors.gold} style={{ marginVertical: 12 }} />
+        )}
+
+        {appointments.length === 0 && !isLoading && (
+          <View style={{ backgroundColor: colors.white, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 24, alignItems: 'center' }}>
+            <Text style={{ fontFamily: fontFamilies.body, fontSize: 14, color: colors.textTertiary, textAlign: 'center' }}>No appointments scheduled for {DAY_FULL[selectedDay]}.</Text>
+          </View>
         )}
 
         {appointments.map((apt, i) => (

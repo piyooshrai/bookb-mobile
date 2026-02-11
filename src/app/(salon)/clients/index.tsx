@@ -55,9 +55,9 @@ export default function ClientListScreen() {
   );
 
   const displayClients: Client[] = useMemo(() => {
-    if (isDemo || !appointmentsData) return MOCK_CLIENTS;
+    if (isDemo) return MOCK_CLIENTS;
+    if (!appointmentsData) return [];
     const list = Array.isArray(appointmentsData) ? appointmentsData : (appointmentsData as any)?.result || (appointmentsData as any)?.appointments || [];
-    if (list.length === 0) return MOCK_CLIENTS;
     // Deduplicate by user id
     const clientMap = new Map<string, { name: string; visits: number; spend: number; lastDate: string; phone: string }>();
     list.forEach((apt: any) => {
@@ -127,8 +127,13 @@ export default function ClientListScreen() {
             <ActivityIndicator size="small" color={colors.gold} />
           </View>
         )}
+        {!isDemo && !isLoading && filteredClients.length === 0 && (
+          <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+            <Text style={{ fontFamily: fontFamilies.body, fontSize: 14, color: colors.textTertiary }}>No clients found</Text>
+          </View>
+        )}
         {filteredClients.map((client) => (
-          <TouchableOpacity key={client.id} style={styles.card} activeOpacity={0.7} onPress={() => router.push(`/(salon)/clients/${client.id}`)}>
+          <TouchableOpacity key={client.id} style={styles.card} activeOpacity={0.7} onPress={() => router.push({ pathname: '/(salon)/clients/[id]', params: { id: client.id, name: client.name, phone: client.phone, visits: String(client.totalVisits), spent: String(client.totalSpend) } })}>
             <View style={styles.cardRow}>
               {/* Avatar */}
               <View style={styles.avatar}>

@@ -41,28 +41,42 @@ export default function SalonDetail() {
     ? salonListData.result.find((u: User) => u._id === id)
     : null;
 
-  // Map API data to display values (fallback to mock data)
-  const salonName = apiSalon?.name || 'Luxe Hair Studio';
-  const salonLocation = apiSalon?.address || '142 West 57th St, New York';
+  // Map API data to display values (demo → mock fallbacks, non-demo → API data or empty state)
+  const salonName = apiSalon?.name || (isDemo ? 'Luxe Hair Studio' : 'Unknown Salon');
+  const salonLocation = apiSalon?.address || (isDemo ? '142 West 57th St, New York' : 'No location');
   const isActive = apiSalon ? apiSalon.active : true;
   const joinedDate = apiSalon?.createdAt
     ? `Joined ${new Date(apiSalon.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
-    : 'Joined Jan 2024';
-  const planName = apiSalon?.subscription?.[0]?.plan || 'Professional';
-  const ownerName = apiSalon?.name || 'John Mitchell';
-  const ownerEmail = apiSalon?.email || 'john@luxehairstudio.com';
-  const ownerPhone = apiSalon?.phone || '(212) 555-0142';
+    : isDemo ? 'Joined Jan 2024' : 'N/A';
+  const planName = apiSalon?.subscription?.[0]?.plan || (isDemo ? 'Professional' : 'N/A');
+  const ownerName = apiSalon?.name || (isDemo ? 'John Mitchell' : 'Unknown');
+  const ownerEmail = apiSalon?.email || (isDemo ? 'john@luxehairstudio.com' : 'N/A');
+  const ownerPhone = apiSalon?.phone || (isDemo ? '(212) 555-0142' : 'N/A');
 
-  const salonStats = apiSalon
-    ? [
-        { label: 'Stylists', value: String(apiSalon.stylistCount || 0) },
-        { label: 'Appts/month', value: MOCK_SALON_STATS[1].value },
-        { label: 'Monthly Rev', value: MOCK_SALON_STATS[2].value },
-        { label: 'Clients', value: MOCK_SALON_STATS[3].value },
-      ]
-    : MOCK_SALON_STATS;
+  const salonStats = isDemo
+    ? MOCK_SALON_STATS
+    : apiSalon
+      ? [
+          { label: 'Stylists', value: String(apiSalon.stylistCount || 0) },
+          { label: 'Appts/month', value: '0' },
+          { label: 'Monthly Rev', value: '$0' },
+          { label: 'Clients', value: '0' },
+        ]
+      : [
+          { label: 'Stylists', value: '0' },
+          { label: 'Appts/month', value: '0' },
+          { label: 'Monthly Rev', value: '$0' },
+          { label: 'Clients', value: '0' },
+        ];
 
-  const performanceMetrics = MOCK_PERFORMANCE_METRICS;
+  // Performance metrics: demo → mock, non-demo → zeros (no API endpoint)
+  const performanceMetrics = isDemo
+    ? MOCK_PERFORMANCE_METRICS
+    : [
+        { label: 'Conversion Rate', value: '0%' },
+        { label: 'Retention Rate', value: '0%' },
+        { label: 'Avg Ticket', value: '$0' },
+      ];
 
   const handleSuspendToggle = useCallback(() => {
     if (isDemo || !apiSalon) return;

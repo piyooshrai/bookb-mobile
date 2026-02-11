@@ -66,15 +66,20 @@ export default function Plans() {
   const { data: subscriptionData, isLoading } = useAdminSubscription();
 
   // Map API subscription data to enrich plan cards with real subscriber counts
-  const plans = !isDemo && subscriptionData && Array.isArray(subscriptionData)
-    ? MOCK_PLANS.map((mockPlan) => {
-        const apiMatch = subscriptionData.find(
-          (item: { plan: string; count: number }) =>
-            item.plan?.toLowerCase() === mockPlan.name.toLowerCase(),
-        );
-        return apiMatch ? { ...mockPlan, subscribers: apiMatch.count } : mockPlan;
-      })
-    : MOCK_PLANS;
+  // Demo → mock plans with mock subscriber counts
+  // Non-demo → plan structure with API subscriber counts (zero if no API match)
+  const plans = isDemo
+    ? MOCK_PLANS
+    : MOCK_PLANS.map((mockPlan) => {
+        if (subscriptionData && Array.isArray(subscriptionData)) {
+          const apiMatch = subscriptionData.find(
+            (item: { plan: string; count: number }) =>
+              item.plan?.toLowerCase() === mockPlan.name.toLowerCase(),
+          );
+          return { ...mockPlan, subscribers: apiMatch ? apiMatch.count : 0 };
+        }
+        return { ...mockPlan, subscribers: 0 };
+      });
 
   const totalSubscribers = plans.reduce((sum, p) => sum + p.subscribers, 0);
 
